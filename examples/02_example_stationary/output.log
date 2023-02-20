@@ -1,0 +1,118 @@
+================== Invoke Dr31Di21Process ==================
+ 
+Drift Coefficient(s): [2, 3] 
+Diffusion Coefficient(s): [1, 2] 
+
+Generate MET data:                 Successful 
+
+================== Invoke Inference Model ==================
+ 
+Construct PDE Problem:             
+ --- FEM Problem Settings --- 
+Setting                        | Value               
+-----------------------------------------------------
+num_mesh_points                | 200                 
+boundary_locations             | [-1, 1]             
+boundary_values                | [0, 0]              
+element_degrees                | [1, 1]              
+
+Successful 
+
+Construct Prior:                   
+ --- Prior Settings --- 
+Setting                        | Value               
+-----------------------------------------------------
+mean_function                  | lambda x: -0.5*x, lambda x: 1.5*np.ones(x.size)
+gamma                          | 1                   
+delta                          | 1                   
+robin_bc                       | False               
+
+Successful 
+
+Construct Misfit:                  
+ --- Misfit Settings --- 
+Setting                        | Value               
+-----------------------------------------------------
+data_std                       | 0.01                
+num_points                     | 50                  
+
+Successful 
+
+ 
+=============== Conduct Linearized Inference ===============
+ 
+
+ --- Solver Settings --- 
+Setting                        | Value               
+-----------------------------------------------------
+rel_tolerance                  | 1e-06               
+abs_tolerance                  | 1e-12               
+max_iter                       | 50                  
+GN_iter                        | 5                   
+c_armijo                       | 0.0001              
+max_backtracking_iter          | 10                  
+
+
+ --- Hessian Settings --- 
+Setting                        | Value               
+-----------------------------------------------------
+num_eigvals                    | 10                  
+num_oversampling               | 10                  
+
+Solve for MAP: 
+
+Not Converged 
+Termination reason:                Maximum number of backtracking reached 
+Final gradient norm:               69.73475750254399 
+Final cost:                        38.97119483769329 
+
+Construct Reduced Hessian:         Successful 
+
+ 
+ 
+=================== Invoke Postprocessor ===================
+ 
+Visualize Hessian Data 
+
+Visualize Parameter Functions, mode='linearized' 
+
+Visualize PDE Solution, mode='linearized' 
+
+ 
+===================== Invoke Sampling ======================
+ 
+Construct Sampler:                 
+ --- Sampler Settings --- 
+Setting                        | Value               
+-----------------------------------------------------
+algorithm                      | MALA                
+use_gr_posterior               | True                
+StepSize                       | 0.1                 
+
+Successful 
+
+Start Sampling:                    
+
+
+ --- Sampling Run Settings --- 
+Setting                        | Value               
+-----------------------------------------------------
+NumSamples                     | 1000                
+BurnIn                         | 100                 
+init_variance                  | 0.1                 
+init_seed                      | 0                   
+
+                                                            
+Evaluate QOI:                      Successful 
+ 
+=================== Invoke Postprocessor ===================
+ 
+Visualize Parameter Functions, mode='mcmc' 
+
+Visualize PDE Solution, mode='mcmc' 
+
+Postprocess QOI Data: 
+
+Mean Value:              13.9   
+Autocorrelation length:  55.2   
+Effective sample size:   16.3   

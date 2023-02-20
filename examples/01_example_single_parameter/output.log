@@ -1,0 +1,81 @@
+===================== Invoke OUProcess =====================
+ 
+Drift Coefficient(s): 1 
+Diffusion Coefficient(s): 1 
+
+Generate MET data:                 Successful 
+
+================== Invoke Inference Model ==================
+ 
+Construct PDE Problem:             
+ --- FEM Problem Settings --- 
+Setting                        | Value               
+-----------------------------------------------------
+num_mesh_points                | 500                 
+boundary_locations             | [-1, 1]             
+boundary_values                | [0, 0]              
+element_degrees                | [1, 1]              
+squared_diffusion_function     | lambda x: np.ones(x.shape)
+
+Successful 
+
+Construct Prior:                   
+ --- Prior Settings --- 
+Setting                        | Value               
+-----------------------------------------------------
+mean_function                  | lambda x: np.ones(x.shape)
+gamma                          | 1                   
+delta                          | 2                   
+robin_bc                       | False               
+
+Successful 
+
+Construct Misfit:                  
+ --- Misfit Settings --- 
+Setting                        | Value               
+-----------------------------------------------------
+data_std                       | 0.02                
+num_points                     | 50                  
+
+Successful 
+
+ 
+=============== Conduct Linearized Inference ===============
+ 
+
+ --- Solver Settings --- 
+Setting                        | Value               
+-----------------------------------------------------
+rel_tolerance                  | 1e-06               
+abs_tolerance                  | 1e-12               
+max_iter                       | 50                  
+GN_iter                        | 5                   
+c_armijo                       | 0.0001              
+max_backtracking_iter          | 10                  
+
+
+ --- Hessian Settings --- 
+Setting                        | Value               
+-----------------------------------------------------
+num_eigvals                    | 20                  
+num_oversampling               | 5                   
+
+Solve for MAP: 
+
+Converged in 8 iterations. 
+Termination reason:                Norm of the gradient less than tolerance 
+Final gradient norm:               0.00012393505278731373 
+Final cost:                        28.659849441460413 
+
+Construct Reduced Hessian:         Successful 
+
+ 
+ 
+=================== Invoke Postprocessor ===================
+ 
+Visualize Hessian Data 
+
+Visualize Parameter Functions, mode='linearized' 
+
+Visualize PDE Solution, mode='linearized' 
+
