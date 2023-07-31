@@ -1,0 +1,16 @@
+name: stochastic_process_inference
+channels:
+  - conda-forge
+dependencies:
+  - fenics
+  - muq
+  - scipy
+  - matplotlib
+  - seaborn
+  - statsmodels
+  - jupyter
+  - pre-commit
+  - pytest
+  pip:
+    - hippylib
+    - git+https://github.com/hippylib/hippylib2muq.git
