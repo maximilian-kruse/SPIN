@@ -57,7 +57,7 @@ class SDEInferenceModel:
         pdeProblem (hl.PDEProblem):
             PDE variational problem necessary for Bayesian optimization procedure
         prior (hl.modeling.prior.SqrtPrecisionPDE_Prior):
-            Prior with predefined precition operator
+            Prior with predefined precision operator
         simTimes (np.ndarray):
             Simulation time array for transient PDE problem solves
 
@@ -73,7 +73,7 @@ class SDEInferenceModel:
         check_gradient:
             Computes the gradient of the pde problem variation w.r.t. given parameter function
         get_prior_info:
-            Gets prior mean function and pointwise variance field
+            Gets prior mean function and point-wise variance field
     """
     
     _problemDim = 1
@@ -233,7 +233,7 @@ class SDEInferenceModel:
                 -> initial_condition (Callable, fe.GenericVector): Initial state function
 
         Raises:
-            ValueError: Checks for drift (diffusion) callable if (diffusion) drift is inferrred
+            ValueError: Checks for drift (diffusion) callable if (diffusion) drift is inferred
             MiscErrors: Checks FEM settings dict
             MiscErrors: Checks Transient settings dict
 
@@ -395,7 +395,7 @@ class SDEInferenceModel:
         the log posterior. This optimization is performed by an inexact Newton-CG algorithm, which
         requires the first and second variations of the problem components (pde constraint, 
         likelihood, prior). Furthermore, the algorithm employs a globalization strategy in the form
-        of armijo line search.
+        of Armijo line search.
         After the determination of the MAP "point", the routine computes a low-rank approximation of
         the posterior Hessian. The approximation relies on the dominant eigenvalues of the Hessian
         and allows for a computationally efficient evaluation of the posterior covariance field at
@@ -421,7 +421,7 @@ class SDEInferenceModel:
             MiscErrors: Checks hessian settings dict
 
         Returns:
-            Tuple[list[np.ndarray]]: Arrays for MAP data (mean, pointwise variance, forward solution)
+            Tuple[list[np.ndarray]]: Arrays for MAP data (mean, point-wise variance, forward solution)
                                      and reduced Hessian eigenvalues
         """
 
@@ -492,7 +492,7 @@ class SDEInferenceModel:
 
     #-----------------------------------------------------------------------------------------------
     def get_prior_info(self, method: str) -> Tuple[fe.Function, fe.Function]:
-        """Returns prior mean and pointwise variance function
+        """Returns prior mean and point-wise variance function
 
         For an efficient computation of the variance field, use the 'Randomized' method. Other
         methods are 'Exact' and 'Estimator'.

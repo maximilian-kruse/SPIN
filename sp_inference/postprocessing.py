@@ -218,7 +218,7 @@ class Postprocessor:
     correct settings depending on the use case.
 
     NOTE: Some of the visualization methods take many arguments, as they visualize many different 
-          data arrays combined. Preferrably invoke these methods with key-value pairs for the
+          data arrays combined. Preferably invoke these methods with key-value pairs for the
           arguments to avoid confusion.
 
     Methods:

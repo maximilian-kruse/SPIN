@@ -17,6 +17,6 @@ MCMC Sampler relying on MAP computation from hIPPYlib and MUQ routines.
 
 3) transient:
 -------------
-Implementation of the mistfit and optimization problem associated with MAP computation
+Implementation of the misfit and optimization problem associated with MAP computation
 of transient models.
 """

@@ -92,7 +92,7 @@ class Logger:
         """Prints heading to file
 
         This routine prints a centered message to the screen and log file, with the provided filler
-        formung a header bar.
+        forming a header bar.
 
         Args:
             message (Any): Message to print
@@ -207,10 +207,10 @@ class Logger:
         Args:
             paramsToInfer (str): Inference parameter functions, options are 'drift', 'diffusion' and 'all'
             isStationary (bool): Determines if the problem is stationary
-            dataStructs (dict[str, Any]): Data for processsing and printing
+            dataStructs (dict[str, Any]): Data for processing and printing
                 -> file_names (list[str]): List of three file names
                 -> function_spaces (list[fe.FunctionSpace]): List of function spaces for forward,
-                                                             parameter andadjoint variables
+                                                             parameter and adjoint variables
                 -> simulation_times (np.ndarray): Simulation time array, only necessary for transient
                                                   models
                 -> solution_data (list[fe.GenericVector, hl.TimeDependentVector]): Data to process
@@ -349,7 +349,7 @@ class Logger:
                              subDir: Optional[str]=None) -> None:
         """Prints numpy array block to file
 
-        It is assumed that the arrays are ordered columnwise, so that the standard 'numpy.savetxt'
+        It is assumed that the arrays are ordered column-wise, so that the standard 'numpy.savetxt'
         command can be used.
 
         Args:
@@ -401,7 +401,7 @@ class Logger:
 
     #-----------------------------------------------------------------------------------------------
     def _get_default_headers(self, paramsToInfer: str) -> None:
-        """Retruns standard headings of array files for inference data"""
+        """Returns standard headings of array files for inference data"""
         
         if paramsToInfer == "drift":
             meanHeading = ["x", "mean(f(x))"]

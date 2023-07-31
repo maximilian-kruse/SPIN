@@ -6,12 +6,12 @@ as for the mean exit time problem. The processes are implemented in a class hier
 concrete implementations inherit their interface and common functionality for an abstract base class.
 Further, the naming of the subclasses follows certain conventions:
 - Processes with a well-known name are named accordingly
-- The other implemented proceses have drift and diffusion function in the form of polynomials.
+- The other implemented processes have drift and diffusion function in the form of polynomials.
   Therefore, their name is assembled from the prefixed 'Dr' (drift) and 'Di' (diffusion), following
   by a sequence of numbers indicating the terms in the associated polynomials with their respective
   degrees.
 
-NOTE: The current implementeation is restricted to problems of ONE spatial dimension
+NOTE: The current implementation is restricted to problems of ONE spatial dimension
 
 Classes:
 --------
@@ -19,7 +19,7 @@ BaseProcess: Abstract base class for stochastic processes
 OUProcess: Ornstein-Uhlenbeck process
 Dr3Di0Process: Process with cubic drift and constant diffusion
 Dr31Di0Process: Process with cubic + linear drift and constant diffusion
-Dr31Di21Process: Process with cubic + linear drift and quadratic + linear diffusion ("Landau-Stuart")
+Dr31Di20Process: Process with cubic + linear drift and quadratic + constant diffusion
 
 Methods:
 --------
@@ -54,7 +54,7 @@ class BaseProcess(ABC):
     Methods:
     --------
     generate_data: Generic interface for data generation
-    generate_data_stationary_fpe: Generate noisy data from stationray pdf
+    generate_data_stationary_fpe: Generate noisy data from stationary pdf
     generate_data_mean_exit_time: Generate noisy data from mean exit time function
     generate_data_transient_fpe: Generate noisy data from transient pdf
     compute_transient_distribution_fem: Solve transient FPE with FEM
@@ -395,7 +395,7 @@ class BaseProcess(ABC):
     def compute_transient_distribution_exact(spacePoints: Union[int, float, np.ndarray], 
                                              timePoints: Union[int, float, np.ndarray]) \
                                              -> np.ndarray:
-        """Computes transient distribution from analyticala expression
+        """Computes transient distribution from analytical expression
 
         Per default this option is not available. It needs to be implemented in the respective
         subclasses (if possible).
@@ -782,7 +782,7 @@ class Dr31Di0Process(BaseProcess):
         return expFunc
 
 #===================== Cubic and Linear Drift, Quadratic and Linear Diffusion ======================
-class Dr31Di21Process(BaseProcess):
+class Dr31Di20Process(BaseProcess):
     """Landau-Stuart process (cubic + linear drift and quadratic + linear diffusion)"""
     
     _sizeDriftCoeff = 2

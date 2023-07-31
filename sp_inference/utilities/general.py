@@ -251,7 +251,7 @@ def reshape_fe_array(flatArray: np.ndarray, numComponents: int) -> np.ndarray:
 
 #---------------------------------------------------------------------------------------------------
 def check_settings_dict(dictToTest: dict[str, Any], checkDict: dict[str, Any]) -> None:
-    """Checks settings dictionary agains prototype
+    """Checks settings dictionary against prototype
 
     The prototype contains information on the type  and possible bounds of the different values.
     It further determines which arguments are optional. Therefore, the prototype dictionary contains

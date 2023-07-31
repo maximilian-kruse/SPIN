@@ -36,7 +36,7 @@ class MCMCSampler:
     inference problems. Starting point for the sampling is a hIPPYlib posterior object resulting
     from the computation of the MAP point. Configuration of the sampler is done via a settings
     dictionary. The class implements pCN (random walk) and MALA (gradient-informed) algorithms.
-    For large problems, MALA is the preferrable option.
+    For large problems, MALA is the preferable option.
     The sampling functionalities of this class heavily rely on the MUQ library via hippylib2muq
     bindings. For more detailed information, please refer to the respective projects.
 
@@ -70,7 +70,7 @@ class MCMCSampler:
                  logger: Optional[logging.Logger]=None) -> None:
         """Constructor
 
-        The constructor calls the methods to set up the MCMC Kernel and workgraph. The latter is
+        The constructor calls the methods to set up the MCMC Kernel and work graph. The latter is
         important to generate an AD tape over the entire sampling problem.
 
         Args:

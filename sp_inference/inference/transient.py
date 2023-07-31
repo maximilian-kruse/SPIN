@@ -6,7 +6,7 @@ functionality significantly. Their interface integrates seamlessly into the over
 framework. As a consequence, function and property naming deviates from that of the remaining code.
 The transient problem classes underlie certain assumptions. Most importantly, they only work
 fro pde problems linear in the forward, parameter and adjoint variables. However, these restrictions
-can be aleviated relatively easy, at the cost of making the procedure mode computationally expensive.
+can be alleviated relatively easy, at the cost of making the procedure mode computationally expensive.
 The precise code locations for extensions are highlighted accordingly. Moreover, all transient
 solves work on uniform grids with fixed time step size :math: `dt`. Again, the solving routines
 might be easily extended towards more sophisticated algorithms. Lastly, while the forward and 
@@ -16,7 +16,7 @@ The theoretical background for the implementation mainly relies on
 `this article <https://apps.dtic.mil/sti/citations/ADA555315>`_. Prior knowledge of the methods
 presented therein is necessary to understand the code.
 
-NOTE: The code explanations often use the terms 'variable', 'function' and 'vector' interchangably.
+NOTE: The code explanations often use the terms 'variable', 'function' and 'vector' interchangeably.
       This is the case because the variables of the inference problem are indeed functions. In the
       context of FEM discretization, in turn, these functions are expressed as coefficient vectors
       associated with the chosen basis functions.
@@ -553,7 +553,7 @@ class TransientPDEVariationalProblem(hl.PDEProblem):
         The adjoint problem results from the first variation of the Lagrangian w.r.t. to the forward
         variable. It is a final value problem with homogeneous final value and boundary conditions.
         Accordingly, the it needs to be solved backwards in time. For given parameter and forward
-        function, the adjoint problem yields the adjoint variable, which correspons to the lagrange
+        function, the adjoint problem yields the adjoint variable, which corresponds to the Lagrange
         multiplier of the PDE constraint in the optimization setting. 
 
         Args:
@@ -694,7 +694,7 @@ class TransientPDEVariationalProblem(hl.PDEProblem):
 
         The incremental forward problem is an initial value problem, which is solved forward in time.
         In contrast, the incremental adjoint problem is a final value problem, which needs to be 
-        solved backwards in time. Both probems obey homogeneous initial/final value and boundary
+        solved backwards in time. Both problems obey homogeneous initial/final value and boundary
         conditions, since they solve for increments only.
 
         Args:
@@ -743,7 +743,7 @@ class TransientPDEVariationalProblem(hl.PDEProblem):
 
         This routines applies the second variation of the Lagrangian in a given direction. It is
         merely a wrapper that calls different subroutines depending on the provided index pair.
-        If the Gauss-Newton approximation has been enabled, the cross-terms of the Hessina of
+        If the Gauss-Newton approximation has been enabled, the cross-terms of the Hessian of
         forward and parameter function are automatically set to zero.
 
         Args:
@@ -773,7 +773,7 @@ class TransientPDEVariationalProblem(hl.PDEProblem):
         elif [iInd, jInd] == [hl.ADJOINT, hl.PARAMETER]:
             self._apply_hess_other_param(direction, outVec, isForward=False)
         else:
-            raise ValueError(f"Funcion not supported for the "
+            raise ValueError(f"Function not supported for the "
                               "combination of indices '{iInd}, {jInd}'")  
 
     #-----------------------------------------------------------------------------------------------
