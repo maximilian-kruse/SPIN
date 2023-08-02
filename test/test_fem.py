@@ -20,7 +20,8 @@ with warnings.catch_warnings():
 #============================================== Data ===============================================
 
 class TestData:
-    problemDim = 1
+    domainDim = 1
+    solutionDim = 1
     lowerDomainBound = -5
     upperDomainBound = 5
     boundaryValue = 0
@@ -51,11 +52,11 @@ def fem_space_setup() -> Tuple:
     funcSpaceVec = fe.VectorFunctionSpace(mesh, 
                                           'Lagrange',
                                           TestData.femElemDegree,
-                                          dim=TestData.problemDim)
+                                          dim=TestData.domainDim)
     funcSpaceTensor = fe.TensorFunctionSpace(mesh,
                                              'Lagrange',
                                              TestData.femElemDegree,
-                                             shape=2*(TestData.problemDim,))
+                                             shape=2*(TestData.domainDim,))
 
     return mesh, funcSpace, funcSpaceVec, funcSpaceTensor
 
@@ -81,8 +82,7 @@ def transient_problem_setup(fem_space_setup: Tuple, fem_var_setup: Tuple) -> Tup
 
     _, funcSpace, *_ = fem_space_setup
     forwardFunc, adjointFunc, driftFunc, diffusionFunc = fem_var_setup
-    varFormHandle = femForms.VariationalFormHandler
-    varFormFunc = varFormHandle.get_form('fokker_planck')
+    varFormFunc, _ = femForms.get_form('fokker_planck')
     varForm = varFormFunc(forwardFunc, driftFunc, diffusionFunc, adjointFunc)
     bcList = [fe.DirichletBC(funcSpace, fe.Constant(TestData.boundaryValue), on_boundary)]
 
@@ -103,26 +103,6 @@ def transient_matrix_setup(fem_var_setup: Tuple, transient_problem_setup: Tuple)
         bc.apply(lhsMatrix)
 
     return massMatrix, lhsMatrix, rhsVector
-
-
-#========================================= FEM Form Test ===========================================
-
-#---------------------------------------------------------------------------------------------------
-def test_form_generation(fem_var_setup: Tuple) -> None:
-    forwardFunc, adjointFunc, driftFunc, diffusionFunc = fem_var_setup
-    varFormHandle = femForms.VariationalFormHandler
-
-    formOpts = varFormHandle.get_option_list()
-    assert isinstance(formOpts, list)
-
-    for option in formOpts:
-        print(option)
-        varFormCallable = varFormHandle.get_form(option)
-        assert isinstance(varFormCallable, Callable)
-
-        varForm = varFormCallable(forwardFunc, driftFunc, diffusionFunc, adjointFunc)
-        assert isinstance(varForm, ufl.form.Form)
-
 
 #======================================= FEM Function Tests ========================================
 
@@ -175,18 +155,20 @@ def test_transient_solve(fem_space_setup: Tuple,
 
 #---------------------------------------------------------------------------------------------------
 def test_stationary_fem_problem() -> None:
-    dim = TestData.problemDim
-    problem =  femProblems.FEMProblem(dim, TestData.feSettings)
+    domainDim = TestData.domainDim
+    solutionDim = TestData.solutionDim
+    problem = femProblems.FEMProblem(domainDim, solutionDim, TestData.feSettings)
 
     assert isinstance(problem.mesh, fe.Mesh)
     assert (isinstance(problem.funcSpaceVar, fe.FunctionSpace)
             and problem.funcSpaceVar.num_sub_spaces() == 0)
     assert (isinstance(problem.funcSpaceDrift, fe.FunctionSpace)
-            and problem.funcSpaceDrift.num_sub_spaces() == dim)
+            and problem.funcSpaceDrift.num_sub_spaces() == domainDim)
     assert (isinstance(problem.funcSpaceDiffusion, fe.FunctionSpace)
-            and problem.funcSpaceDiffusion.num_sub_spaces() == dim)
+            and problem.funcSpaceDiffusion.num_sub_spaces() == domainDim)
     assert (isinstance(problem.funcSpaceAll, fe.FunctionSpace)
-            and problem.funcSpaceAll.num_sub_spaces() == int(0.5 * dim * (dim + 1)) + dim)
+            and problem.funcSpaceAll.num_sub_spaces() \
+                == int(0.5 * domainDim * (domainDim + 1)) + domainDim)
 
     assert (isinstance(problem.boundCondsForward, list)
             and all(isinstance(bc, fe.DirichletBC) for bc in problem.boundCondsForward))
@@ -195,13 +177,13 @@ def test_stationary_fem_problem() -> None:
 
 #---------------------------------------------------------------------------------------------------
 def test_transient_fem_problem() -> None:
-    problem = femProblems.TransientFEMProblem(TestData.problemDim, 
+    problem = femProblems.TransientFEMProblem(TestData.domainDim,
+                                              TestData.solutionDim,
                                               TestData.feSettings, 
                                               TestData.simTimes)
     driftFunc = lambda x: -x
     diffusionFunc = lambda x: np.ones(x.size)
-    varFormHandle = femForms.VariationalFormHandler
-    varFormFunc = varFormHandle.get_form('fokker_planck')
+    varFormFunc, _ = femForms.get_form('fokker_planck')
 
     problem.assemble(varFormFunc, driftFunc, diffusionFunc)
     transientSol = problem.solve(TestData.initSol)

@@ -53,7 +53,7 @@ class FEMProblem:
     }
 
     #-----------------------------------------------------------------------------------------------
-    def __init__(self, dimension: int, feSettings: dict[str, Any]) -> None:
+    def __init__(self, domainDim: int, solutionDim: int, feSettings: dict[str, Any]) -> None:
         """Constructor
 
         Calls setup routines.
@@ -75,11 +75,14 @@ class FEMProblem:
             MiscErrors: Checks FEM settings
         """
 
-        if not dimension in [1, 2]:
+        if not domainDim in [1, 2]:
             raise ValueError("Problem dimension needs to be one or two.")
+        if not solutionDim > 0:
+            raise ValueError("Solution dimension needs to be positive integer.")
         utils.check_settings_dict(feSettings, self._checkDictFE)
 
-        self._problemDim = dimension
+        self._domainDim = domainDim
+        self._solutionDim = solutionDim
         self._mesh = None
         self._funcSpaceVar = None
         self._funcSpaceDrift = None
@@ -118,14 +121,14 @@ class FEMProblem:
             fe.Mesh: Mesh object
         """
 
-        if self._problemDim == 1:
+        if self._domainDim == 1:
             if not isinstance(numMeshPoints, int):
                 raise TypeError("1D problem requires single integer for number of mesh points.")
             if not len(boundaryLocs) == 2:
                 raise TypeError("1D problem requires two boundary locations.")
             mesh = fe.IntervalMesh(numMeshPoints, *boundaryLocs)
             
-        elif self._problemDim == 2:
+        elif self._domainDim == 2:
             if not isinstance(numMeshPoints, list):
                 raise TypeError("1D problem requires list of two integers for number of mesh points.")
             if not len(boundaryLocs) == 4:
@@ -159,18 +162,24 @@ class FEMProblem:
         and all(isinstance(degree, int) for degree in elemDegrees) ):
             raise TypeError("Need to provide element degrees as list of ints.")
 
-        funcSpaceVar = fe.FunctionSpace(mesh, 'Lagrange', elemDegrees[0])      
+        if self._solutionDim == 1:
+            funcSpaceVar = fe.FunctionSpace(mesh, 'Lagrange', elemDegrees[0])
+        else:
+            funcSpaceVar = fe.VectorFunctionSpace(mesh,
+                                                  'Lagrange',
+                                                  elemDegrees[0],
+                                                  dim=self._solutionDim)
         funcSpaceDrift = fe.VectorFunctionSpace(mesh,
                                                 'Lagrange',
                                                 elemDegrees[1],
-                                                dim=self._problemDim)
+                                                dim=self._domainDim)
         funcSpaceDiffusion = fe.TensorFunctionSpace(mesh, 
                                                     'Lagrange', 
                                                     elemDegrees[1],
-                                                    shape=(self._problemDim, self._problemDim), 
+                                                    shape=(self._domainDim, self._domainDim), 
                                                     symmetry=True)
                                   
-        numElems = int(0.5 * self._problemDim * (self._problemDim + 1)) + self._problemDim
+        numElems = int(0.5 * self._domainDim * (self._domainDim + 1)) + self._domainDim
         funcSpaceAll = fe.VectorFunctionSpace(mesh, 'Lagrange', elemDegrees[1], dim=numElems)
 
         return funcSpaceVar, funcSpaceDrift, funcSpaceDiffusion, funcSpaceAll
@@ -188,9 +197,9 @@ class FEMProblem:
                    adjoint/test function.
         """
 
-        assert isinstance(boundaryLocs, list) and len(boundaryLocs) == 2*self._problemDim, \
+        assert isinstance(boundaryLocs, list) and len(boundaryLocs) == 2*self._domainDim, \
             "Boundary locations need to be provided as list with two (1D) or 4 (2D) entries."
-        assert isinstance(boundaryVals, list) and len(boundaryVals) == 2*self._problemDim, \
+        assert isinstance(boundaryVals, list) and len(boundaryVals) == 2*self._domainDim, \
             "Boundary values need to be provided as list with two (1D) or 4 (2D) entries."
         assert all(isinstance(loc, (int, float)) for loc in boundaryLocs), \
             "Boundary locations need to be provided as numbers."
@@ -198,7 +207,7 @@ class FEMProblem:
             "Boundary values need to be provided as numbers."
         
         boundCondsForward = []     
-        for i in range(2*self._problemDim):
+        for i in range(2*self._domainDim):
             _boundaryLocs[_boundaryNames[i]] = boundaryLocs[i]
             boundCondsForward.append(fe.DirichletBC(funcSpace, fe.Constant(boundaryVals[i]),
                                      _boundaryFuncs[i]))
@@ -321,7 +330,8 @@ class TransientFEMProblem(FEMProblem):
 
     #-----------------------------------------------------------------------------------------------
     def __init__(self, 
-                 dimension: int, 
+                 domainDim: int,
+                 solutionDim: int,
                  feSettings: dict[str, Any], 
                  simTimes: np.ndarray) -> None:
         """Constructor
@@ -338,7 +348,7 @@ class TransientFEMProblem(FEMProblem):
             ValueError: Checks that simulation time points are evenly spaced
         """
         
-        super().__init__(dimension, feSettings)
+        super().__init__(domainDim, solutionDim, feSettings)
         if not isinstance(simTimes, np.ndarray):
             raise TypeError("Need to provide simulation times as numpy array.")
         if not np.allclose(np.diff(simTimes), np.diff(simTimes)[0]):

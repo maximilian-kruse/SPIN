@@ -20,7 +20,8 @@ with warnings.catch_warnings():
 #============================================== Data ===============================================
 
 class TestData:
-    problemDim = 1
+    domainDim = 1
+    solutionDim = 1
     lowerDomainBound = -5
     upperDomainBound = 5
     boundaryValue = 0
@@ -73,11 +74,11 @@ def fem_space_setup() -> Tuple:
     funcSpaceDrift = fe.VectorFunctionSpace(mesh, 
                                             'Lagrange',
                                             TestData.femElemDegree,
-                                            dim=TestData.problemDim)
+                                            dim=TestData.domainDim)
     funcSpaceDiffusion = fe.TensorFunctionSpace(mesh,
                                                 'Lagrange',
                                                 TestData.femElemDegree,
-                                                shape=2*(TestData.problemDim,),
+                                                shape=2*(TestData.domainDim,),
                                                 symmetry=True)
 
     return mesh, funcSpaceVar, funcSpaceDrift, funcSpaceDiffusion
@@ -124,7 +125,7 @@ def misfit_setup(fem_space_setup: Tuple,
 #---------------------------------------------------------------------------------------------------
 @pytest.fixture(scope="module")
 def fem_model_setup():
-    femModel = fem.FEMProblem(TestData.problemDim, TestData.feSettings)
+    femModel = fem.FEMProblem(TestData.domainDim, TestData.solutionDim, TestData.feSettings)
     return femModel
 
 #---------------------------------------------------------------------------------------------------
@@ -142,7 +143,7 @@ def param_var_setup(fem_model_setup: fem.FEMProblem) -> Tuple:
 @pytest.fixture(scope="module")
 def form_handle_setup(param_var_setup: Tuple) -> Callable:
     _, diffusionFunc = param_var_setup
-    formCallable = forms.VariationalFormHandler.get_form("fokker_planck")
+    formCallable, _ = forms.get_form("fokker_planck")
     
     def varform_handle(fwdVar, paramVar, adjVar):
         return formCallable(fwdVar, paramVar, diffusionFunc, adjVar)

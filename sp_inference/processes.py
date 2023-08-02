@@ -135,7 +135,7 @@ class BaseProcess(ABC):
                                                constructed. Defaults to None
         """
 
-        self._problemDim = 1
+        self._domainDim = 1
 
         if driftCoeff is None:
             self.driftCoeff = self._defaultDriftCoeff
@@ -384,8 +384,11 @@ class BaseProcess(ABC):
         initFunc = solverSettings["initial_condition"]
         simTimePoints = np.arange(tStart, tEnd+dt, dt)
         
-        femFormHandle = femForms.VariationalFormHandler.get_form("fokker_planck")
-        femModel = femProblems.TransientFEMProblem(self._problemDim, feSettings, simTimePoints)
+        femFormHandle, solutionDim = femForms.get_form("fokker_planck")
+        femModel = femProblems.TransientFEMProblem(self._domainDim,
+                                                   solutionDim,
+                                                   feSettings,
+                                                   simTimePoints)
         femModel.assemble(femFormHandle, self.compute_drift, self.compute_squared_diffusion)       
         femSol = femModel.solve(initFunc, convert=convert)
 
