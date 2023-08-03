@@ -29,6 +29,8 @@ get_process: Returns class object for given string identifier
 
 #====================================== Preliminary Commands =======================================
 import numpy as np
+import fenics as fe
+import hippylib as hl
 from typing import Any, Callable, Optional, Tuple, Union
 from abc import ABC, abstractmethod
 from scipy import interpolate
@@ -208,34 +210,45 @@ class BaseProcess(ABC):
             Tuple: Perturbed and exact data values at given domain (and time) points
         """
 
-        if modelType == "fokker_planck":
-            if isStationary:
-                utils.check_settings_dict(dataStructs, self._checkDictStatFPE)
-                perturbedValues, exactValues = \
-                    self.generate_data_stationary_fpe(dataPoints=dataStructs["domain_points"],
-                                                      dataStd=dataStructs["standard_deviation"],
-                                                      seed=dataStructs["rng_seed"])
-            else:
-                utils.check_settings_dict(dataStructs, self._checkDictTransFPE)
-                perturbedValues, exactValues = \
-                    self.generate_data_transient_fpe(obsDomainPoints=dataStructs["domain_points"],
-                                                     obsTimePoints=dataStructs["time_points"],
-                                                     dataStd=dataStructs["standard_deviation"],
-                                                     seed=dataStructs["rng_seed"],
-                                                     feSettings=dataStructs["fem_settings"],
-                                                     solverSettings=dataStructs["solver_settings"])
-        elif modelType == "mean_exit_time":
-            if isStationary:
-                utils.check_settings_dict(dataStructs, self._checkDictStatFPE)
-                perturbedValues, exactValues = \
-                    self.generate_data_mean_exit_time(dataPoints=dataStructs["domain_points"],
-                                                      dataStd=dataStructs["standard_deviation"],
-                                                      seed=dataStructs["rng_seed"],
-                                                      domainBounds=dataStructs["domain_bounds"])
-            else:
-                raise ValueError("Mean exit time data is always stationary.")
-        else:
-            raise ValueError("Cannot find data generation function for given model type.")
+        match modelType:
+            case "fokker_planck": 
+                if isStationary:
+                    utils.check_settings_dict(dataStructs, self._checkDictStatFPE)
+                    perturbedValues, exactValues = \
+                        self.generate_data_stationary_fpe(dataPoints=dataStructs["domain_points"],
+                                                          dataStd=dataStructs["standard_deviation"],
+                                                          seed=dataStructs["rng_seed"])
+                else:
+                    utils.check_settings_dict(dataStructs, self._checkDictTransFPE)
+                    perturbedValues, exactValues = \
+                        self.generate_data_transient_fpe(obsDomainPoints=dataStructs["domain_points"],
+                                                         obsTimePoints=dataStructs["time_points"],
+                                                         dataStd=dataStructs["standard_deviation"],
+                                                         seed=dataStructs["rng_seed"],
+                                                         feSettings=dataStructs["fem_settings"],
+                                                         solverSettings=dataStructs["solver_settings"])
+            case "mean_exit_time":
+                if isStationary:
+                    utils.check_settings_dict(dataStructs, self._checkDictMET)
+                    perturbedValues, exactValues = \
+                        self.generate_data_mean_exit_time(dataPoints=dataStructs["domain_points"],
+                                                          dataStd=dataStructs["standard_deviation"],
+                                                          seed=dataStructs["rng_seed"],
+                                                          domainBounds=dataStructs["domain_bounds"])
+                else:
+                    raise ValueError("Mean exit time data is always stationary.")
+            case "mean_exit_time_moments":
+                if isStationary:
+                    perturbedValues, exactValues = \
+                        self.generate_data_mean_exit_time_moments(
+                            dataPoints=dataStructs["domain_points"],
+                            dataStd=dataStructs["standard_deviation"],
+                            seed=dataStructs["rng_seed"],
+                            domainBounds=dataStructs["domain_bounds"])
+                else:
+                    raise ValueError("Mean exit time data is always stationary.")
+            case _:
+                raise ValueError("Cannot find data generation function for given model type.")
 
         return perturbedValues, exactValues
 
@@ -302,6 +315,33 @@ class BaseProcess(ABC):
         self._logger.print_arrays_to_file(self._METDataFile, 
                                           ["x", "tau(x)"], 
                                           [dataPoints, perturbedValues],
+                                          self._subDir)
+        self._logger.print_ljust("Successful", end="\n\n")
+
+        return perturbedValues, exactValues
+    
+    #-----------------------------------------------------------------------------------------------
+    def generate_data_mean_exit_time_moments(self, 
+                                     dataPoints: Union[int, float, np.ndarray], 
+                                     dataStd: Union[int,float], 
+                                     seed: int, 
+                                     feSettings: dict[str, Any]) -> Tuple:
+
+        self._logger.print_ljust("Generate MET Moments data:", width=self._printWidth, end="")
+        exactValues, femProblem = self.compute_mean_exit_time_moments(feSettings, convert=False)
+        projectionMatrix = \
+            hl.pointwiseObservation.assemblePointwiseObservation(femProblem.funcSpaceVar,
+                                                                 dataPoints)
+        projectedValues = fe.Vector()
+        projectionMatrix.init_vector(projectedValues, 0)
+        projectionMatrix.mult(exactValues, projectedValues)
+        projectedValues = utils.reshape_to_np_format(projectedValues, 2)
+        perturbedValues = self._perturb_data(projectedValues, dataStd, seed)
+        
+        self._logger.print_arrays_to_file(self._METDataFile,
+                                          ["x", "T^1(x)", "<T^2(x)>"], 
+                                          [dataPoints, perturbedValues[:, 0],
+                                           perturbedValues[:, 1]],
                                           self._subDir)
         self._logger.print_ljust("Successful", end="\n\n")
 
@@ -433,6 +473,21 @@ class BaseProcess(ABC):
         metTimes = utils.process_output_data(metTimes)
 
         return metTimes
+    
+    #-----------------------------------------------------------------------------------------------
+    def compute_mean_exit_time_moments(self, 
+                                       feSettings: dict[str, Any],
+                                       convert: Optional[bool]=True)\
+                                       -> Union[int, float, np.ndarray]:
+
+        femFormHandle, solutionDim = femForms.get_form("mean_exit_time_moments")
+        femProblem = femProblems.FEMProblem(self._domainDim, solutionDim, feSettings)
+        unperturbedData = femProblem.solve(femFormHandle,
+                                           self.compute_drift,
+                                           self.compute_squared_diffusion,
+                                           convert=convert) 
+
+        return unperturbedData, femProblem
 
     #-----------------------------------------------------------------------------------------------
     def _construct_met_interp_handle(self, 

@@ -359,17 +359,33 @@ class SDEInferenceModel:
         if self.isStationary:
             misfitFunctional = hl.PointwiseStateObservation(self.funcSpaces[hl.STATE],
                                                             misfitSettings["data_locations"])
-            misfitFunctional.d.set_local(misfitSettings["data_values"])
+
+            data = utils.reshape_to_fe_format(misfitSettings["data_values"], self._solutionDim)
+            misfitFunctional.d.set_local(data)
         else:
             if not "data_times" in misfitSettings.keys():
                 raise KeyError("Key 'data_times' missing for transient solve.")
-            settingsToPrint["num_times"] = misfitSettings["data_times"].size
+            numTimePoints = misfitSettings["data_times"].size
+            numSpacePoints = misfitSettings["data_locations"].size
+            settingsToPrint["num_times"] = numTimePoints
             misfitFunctional = \
                 transient.TransientPointwiseStateObservation(self.funcSpaces[hl.STATE],
-                                                             misfitSettings["data_locations"],
-                                                             misfitSettings["data_times"],
+                                                             numTimePoints,
+                                                             numSpacePoints,
                                                              self.simTimes)
-            misfitFunctional.d = misfitSettings["data_values"]
+            inputData = misfitSettings["data_values"]
+            if self._solutionDim > 1:
+                if not inputData.shape == (numSpacePoints, self._solutionDim, numTimePoints):
+                    raise ValueError("Data array has wrong shape.")
+                structuredData = np.array((numSpacePoints*self._solutionDim, numTimePoints))
+
+                for i in range(numTimePoints):
+                    structuredData[:, i] = utils.reshape_to_fe_format(inputData[:,:,i],
+                                                                      self._solutionDim)
+            else:
+                structuredData = inputData
+
+            misfitFunctional.d = structuredData
         
         self._logger.print_dict_to_file("Misfit Settings", settingsToPrint)  
         misfitFunctional.noise_variance = misfitSettings["data_std"]**2

@@ -203,18 +203,60 @@ class FEMProblem:
             "Boundary values need to be provided as list with two (1D) or 4 (2D) entries."
         assert all(isinstance(loc, (int, float)) for loc in boundaryLocs), \
             "Boundary locations need to be provided as numbers."
-        assert all(isinstance(val, (int, float)) for val in boundaryVals), \
-            "Boundary values need to be provided as numbers."
         
         boundCondsForward = []     
         for i in range(2*self._domainDim):
             _boundaryLocs[_boundaryNames[i]] = boundaryLocs[i]
-            boundCondsForward.append(fe.DirichletBC(funcSpace, fe.Constant(boundaryVals[i]),
-                                     _boundaryFuncs[i]))
+            if self._solutionDim == 1:
+                boundCondsForward.append(fe.DirichletBC(funcSpace,
+                                         fe.Constant(boundaryVals[i]),
+                                         _boundaryFuncs[i]))
+            else:
+                for j in range(self._solutionDim):
+                    boundCondsForward.append(fe.DirichletBC(funcSpace.sub(j),
+                                             fe.Constant(boundaryVals[i][j]),
+                                             _boundaryFuncs[i]))
 
-        boundCondAdjoint = fe.DirichletBC(funcSpace, fe.Constant(0.0), _on_boundary_dummy)
+        if self._solutionDim == 1:
+            boundCondAdjoint = fe.DirichletBC(funcSpace, fe.Constant(0.0), _on_boundary_dummy)
+        else:
+            boundCondAdjoint = []
+            for j in range(self._solutionDim):
+                boundCondAdjoint.append(fe.DirichletBC(funcSpace.sub(j),
+                                                       fe.Constant(0.0),
+                                                       _on_boundary_dummy))
 
         return boundCondsForward, boundCondAdjoint
+    
+    #-----------------------------------------------------------------------------------------------
+    def solve(self, 
+              formHandle: Callable, 
+              driftFunction: Callable, 
+              diffusionFunction: Callable,
+              convert=True) -> None:
+        
+        if not callable(formHandle):
+            raise TypeError("Form handle needs to be callable object (with 4 arguments).")
+        if not all(callable(func) for func in [driftFunction, diffusionFunction]):
+            raise TypeError("Drift and diffusion function must be callable objects.")
+
+        forwardVar = fe.TrialFunction(self.funcSpaceVar)
+        adjointVar = fe.TestFunction(self.funcSpaceVar)
+        driftVar = utils.pyfunc_to_fefunc(driftFunction, self.funcSpaceDrift)
+        diffusionVar = utils.pyfunc_to_fefunc(diffusionFunction, self.funcSpaceDiffusion)
+        solutionVar = fe.Function(self.funcSpaceVar)
+
+        weakForm = formHandle(forwardVar, driftVar, diffusionVar, adjointVar)
+        lhs = fe.lhs(weakForm)
+        rhs = fe.rhs(weakForm)
+        fe.solve(lhs == rhs, solutionVar, self.boundCondsForward)
+
+        solutionVec = solutionVar.vector()
+        if convert:
+            solutionVec = utils.reshape_to_np_format(solutionVec, self._solutionDim)
+            solutionVec = utils.process_output_data(solutionVec)
+
+        return solutionVec
 
     #-----------------------------------------------------------------------------------------------   
     @property
@@ -446,7 +488,18 @@ class TransientFEMProblem(FEMProblem):
         functions.solve_transient(self._simTimeInds, self._solver, solveSettings, resultVec)
         if convert:
             resultVec = utils.tdv_to_nparray(resultVec)
-            resultVec = utils.process_output_data(resultVec)
+
+            if self._solutionDim > 1:
+                numXValues = int(self._funcSpaceVar.dim() / self._solutionDim)
+                resultVecStructured = np.zeros(numXValues, self._solutionDim, self._simTimes.size)
+
+                for i in range(self._simTimeInds):
+                    resultVecStructured[:, :, i] = utils.reshape_to_np_format(resultVec[:, i],
+                                                                              self._solutionDim)
+            else:
+                resultVecStructured = resultVec
+
+            resultVec = utils.process_output_data(resultVecStructured)
 
         return resultVec
 

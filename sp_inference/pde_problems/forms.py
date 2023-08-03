@@ -46,13 +46,10 @@ class VariationalFormHandler(ABC):
     def form(cls) -> fe.Form:
         pass
         
-    @property
-    def solutionDim(cls) -> int:
-        if VariationalFormHandler._solutionDim is None:
-            raise ValueError("Property has not been initialized.")
-        return VariationalFormHandler._solutionDim
-        
 
+
+#=========================================== Sub-Classes ===========================================
+#---------------------------------------------------------------------------------------------------
 class FokkerPlanckFormHandler(VariationalFormHandler):
     solutionDim = 1
 
@@ -67,6 +64,7 @@ class FokkerPlanckFormHandler(VariationalFormHandler):
 
         return weakForm
 
+#---------------------------------------------------------------------------------------------------
 class MeanExitTimeFormHandler(VariationalFormHandler):
     solutionDim = 1
 
@@ -81,7 +79,7 @@ class MeanExitTimeFormHandler(VariationalFormHandler):
 
         return weakForm
     
-
+#---------------------------------------------------------------------------------------------------
 class MeanExitTimeMomentsFormHandler(VariationalFormHandler):
     solutionDim = 2
 
@@ -99,7 +97,8 @@ class MeanExitTimeMomentsFormHandler(VariationalFormHandler):
         weak_form_vec = weak_form_1 + weak_form_2
     
         return weak_form_vec
-    
+
+#========================================= API Entry Point =========================================   
 def get_form(name: str) -> Tuple[Callable, int]:
     match name:
         case "fokker_planck":

@@ -261,15 +261,15 @@ class Logger:
             raise TypeError("Solution arrays need to be list of [Vector, Vector, Vector/TDV].")
 
         gridPointsState = funcSpaces[hl.STATE].tabulate_dof_coordinates().flatten()
-        gridPointsParam = utils.reshape_fe_array(
+        gridPointsParam = utils.reshape_to_np_format(
             funcSpaces[hl.PARAMETER].tabulate_dof_coordinates(), numParams)[...,0]
 
         meanFileName, varFileName, forwardFileName = fileNameList
         meanSol, varSol, forwardSol = solArrayList
         meanHeading, varHeading, forwardHeading = self._get_default_headers(paramsToInfer)
         
-        meanData = [gridPointsParam, utils.reshape_fe_array(meanSol.get_local(), numParams)]
-        varianceData = [gridPointsParam, utils.reshape_fe_array(varSol.get_local(), numParams)]
+        meanData = [gridPointsParam, utils.reshape_to_np_format(meanSol.get_local(), numParams)]
+        varianceData = [gridPointsParam, utils.reshape_to_np_format(varSol.get_local(), numParams)]
         self.print_arrays_to_file(meanFileName, meanHeading, meanData, subDir)
         self.print_arrays_to_file(varFileName, varHeading, varianceData, subDir)
 
