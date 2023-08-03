@@ -82,13 +82,32 @@ class MeanExitTimeFormHandler(VariationalFormHandler):
         return weakForm
     
 
+class MeanExitTimeMomentsFormHandler(VariationalFormHandler):
+    solutionDim = 2
 
+    @classmethod
+    def form(cls, forwardVar: fe.Function, driftParam: fe.Function,
+             squaredDiffusionParam: fe.Function, adjointVar: fe.Function) -> fe.Form:
+        """Mean exit time operator"""
+
+        weak_form_1 = fe.dot(driftParam * adjointVar[0], fe.grad(forwardVar[0])) * fe.dx \
+                 - 0.5 * fe.dot(fe.div(squaredDiffusionParam * adjointVar[0]), fe.grad(forwardVar[0])) * fe.dx \
+                 + fe.Constant(1) * adjointVar[0] * fe.dx
+        weak_form_2 = fe.dot(driftParam * adjointVar[1], fe.grad(forwardVar[1])) * fe.dx \
+                 - 0.5 * fe.dot(fe.div(squaredDiffusionParam * adjointVar[1]), fe.grad(forwardVar[1])) * fe.dx \
+                 + 2 * forwardVar[0] * adjointVar[1] * fe.dx
+        weak_form_vec = weak_form_1 + weak_form_2
+    
+        return weak_form_vec
+    
 def get_form(name: str) -> Tuple[Callable, int]:
     match name:
         case "fokker_planck":
             FormHandler =  FokkerPlanckFormHandler
         case "mean_exit_time":
             FormHandler = MeanExitTimeFormHandler
+        case "mean_exit_time_moments":
+            FormHandler = MeanExitTimeMomentsFormHandler
         case _:
             raise NotImplementedError("The requested form is not implemented.")
         
