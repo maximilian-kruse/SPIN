@@ -360,7 +360,7 @@ class SDEInferenceModel:
             misfitFunctional = hl.PointwiseStateObservation(self.funcSpaces[hl.STATE],
                                                             misfitSettings["data_locations"])
 
-            data = utils.reshape_to_fe_format(misfitSettings["data_values"], self._solutionDim)
+            data = utils.reshape_to_fe_format(misfitSettings["data_values"])
             misfitFunctional.d.set_local(data)
         else:
             if not "data_times" in misfitSettings.keys():

@@ -335,11 +335,11 @@ class BaseProcess(ABC):
         projectedValues = fe.Vector()
         projectionMatrix.init_vector(projectedValues, 0)
         projectionMatrix.mult(exactValues, projectedValues)
-        projectedValues = utils.reshape_to_np_format(projectedValues, 2)
+        projectedValues = utils.reshape_to_np_format(projectedValues.get_local(), 2)
         perturbedValues = self._perturb_data(projectedValues, dataStd, seed)
         
         self._logger.print_arrays_to_file(self._METDataFile,
-                                          ["x", "T^1(x)", "<T^2(x)>"], 
+                                          ["x", "<T(x)>", "<T^2(x)>"], 
                                           [dataPoints, perturbedValues[:, 0],
                                            perturbedValues[:, 1]],
                                           self._subDir)

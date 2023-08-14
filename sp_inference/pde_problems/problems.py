@@ -96,7 +96,7 @@ class FEMProblem:
         self.funcSpaceVar, self.funcSpaceDrift, self.funcSpaceDiffusion, self.funcSpaceAll \
              = self.set_up_funcspaces(self.mesh, feSettings["element_degrees"])
         self.boundCondsForward, self.boundCondAdjoint \
-             = self.construct_boundary_functions(self.funcSpaceVar, 
+             = self.construct_boundary_functions(self.funcSpaceVar,
                                                  feSettings["boundary_locations"],
                                                  feSettings["boundary_values"])
 
@@ -253,7 +253,7 @@ class FEMProblem:
 
         solutionVec = solutionVar.vector()
         if convert:
-            solutionVec = utils.reshape_to_np_format(solutionVec, self._solutionDim)
+            solutionVec = utils.reshape_to_np_format(solutionVec.get_local(), self._solutionDim)
             solutionVec = utils.process_output_data(solutionVec)
 
         return solutionVec
