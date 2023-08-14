@@ -53,7 +53,7 @@ class FEMProblem:
     }
 
     #-----------------------------------------------------------------------------------------------
-    def __init__(self, dimension: int, feSettings: dict[str, Any]) -> None:
+    def __init__(self, domainDim: int, solutionDim: int, feSettings: dict[str, Any]) -> None:
         """Constructor
 
         Calls setup routines.
@@ -75,11 +75,14 @@ class FEMProblem:
             MiscErrors: Checks FEM settings
         """
 
-        if not dimension in [1, 2]:
+        if not domainDim in [1, 2]:
             raise ValueError("Problem dimension needs to be one or two.")
+        if not solutionDim > 0:
+            raise ValueError("Solution dimension needs to be positive integer.")
         utils.check_settings_dict(feSettings, self._checkDictFE)
 
-        self._problemDim = dimension
+        self._domainDim = domainDim
+        self._solutionDim = solutionDim
         self._mesh = None
         self._funcSpaceVar = None
         self._funcSpaceDrift = None
@@ -93,7 +96,7 @@ class FEMProblem:
         self.funcSpaceVar, self.funcSpaceDrift, self.funcSpaceDiffusion, self.funcSpaceAll \
              = self.set_up_funcspaces(self.mesh, feSettings["element_degrees"])
         self.boundCondsForward, self.boundCondAdjoint \
-             = self.construct_boundary_functions(self.funcSpaceVar, 
+             = self.construct_boundary_functions(self.funcSpaceVar,
                                                  feSettings["boundary_locations"],
                                                  feSettings["boundary_values"])
 
@@ -118,14 +121,14 @@ class FEMProblem:
             fe.Mesh: Mesh object
         """
 
-        if self._problemDim == 1:
+        if self._domainDim == 1:
             if not isinstance(numMeshPoints, int):
                 raise TypeError("1D problem requires single integer for number of mesh points.")
             if not len(boundaryLocs) == 2:
                 raise TypeError("1D problem requires two boundary locations.")
             mesh = fe.IntervalMesh(numMeshPoints, *boundaryLocs)
             
-        elif self._problemDim == 2:
+        elif self._domainDim == 2:
             if not isinstance(numMeshPoints, list):
                 raise TypeError("1D problem requires list of two integers for number of mesh points.")
             if not len(boundaryLocs) == 4:
@@ -159,18 +162,24 @@ class FEMProblem:
         and all(isinstance(degree, int) for degree in elemDegrees) ):
             raise TypeError("Need to provide element degrees as list of ints.")
 
-        funcSpaceVar = fe.FunctionSpace(mesh, 'Lagrange', elemDegrees[0])      
+        if self._solutionDim == 1:
+            funcSpaceVar = fe.FunctionSpace(mesh, 'Lagrange', elemDegrees[0])
+        else:
+            funcSpaceVar = fe.VectorFunctionSpace(mesh,
+                                                  'Lagrange',
+                                                  elemDegrees[0],
+                                                  dim=self._solutionDim)
         funcSpaceDrift = fe.VectorFunctionSpace(mesh,
                                                 'Lagrange',
                                                 elemDegrees[1],
-                                                dim=self._problemDim)
+                                                dim=self._domainDim)
         funcSpaceDiffusion = fe.TensorFunctionSpace(mesh, 
                                                     'Lagrange', 
                                                     elemDegrees[1],
-                                                    shape=(self._problemDim, self._problemDim), 
+                                                    shape=(self._domainDim, self._domainDim), 
                                                     symmetry=True)
                                   
-        numElems = int(0.5 * self._problemDim * (self._problemDim + 1)) + self._problemDim
+        numElems = int(0.5 * self._domainDim * (self._domainDim + 1)) + self._domainDim
         funcSpaceAll = fe.VectorFunctionSpace(mesh, 'Lagrange', elemDegrees[1], dim=numElems)
 
         return funcSpaceVar, funcSpaceDrift, funcSpaceDiffusion, funcSpaceAll
@@ -188,24 +197,66 @@ class FEMProblem:
                    adjoint/test function.
         """
 
-        assert isinstance(boundaryLocs, list) and len(boundaryLocs) == 2*self._problemDim, \
+        assert isinstance(boundaryLocs, list) and len(boundaryLocs) == 2*self._domainDim, \
             "Boundary locations need to be provided as list with two (1D) or 4 (2D) entries."
-        assert isinstance(boundaryVals, list) and len(boundaryVals) == 2*self._problemDim, \
+        assert isinstance(boundaryVals, list) and len(boundaryVals) == 2*self._domainDim, \
             "Boundary values need to be provided as list with two (1D) or 4 (2D) entries."
         assert all(isinstance(loc, (int, float)) for loc in boundaryLocs), \
             "Boundary locations need to be provided as numbers."
-        assert all(isinstance(val, (int, float)) for val in boundaryVals), \
-            "Boundary values need to be provided as numbers."
         
         boundCondsForward = []     
-        for i in range(2*self._problemDim):
+        for i in range(2*self._domainDim):
             _boundaryLocs[_boundaryNames[i]] = boundaryLocs[i]
-            boundCondsForward.append(fe.DirichletBC(funcSpace, fe.Constant(boundaryVals[i]),
-                                     _boundaryFuncs[i]))
+            if self._solutionDim == 1:
+                boundCondsForward.append(fe.DirichletBC(funcSpace,
+                                         fe.Constant(boundaryVals[i]),
+                                         _boundaryFuncs[i]))
+            else:
+                for j in range(self._solutionDim):
+                    boundCondsForward.append(fe.DirichletBC(funcSpace.sub(j),
+                                             fe.Constant(boundaryVals[i][j]),
+                                             _boundaryFuncs[i]))
 
-        boundCondAdjoint = fe.DirichletBC(funcSpace, fe.Constant(0.0), _on_boundary_dummy)
+        if self._solutionDim == 1:
+            boundCondAdjoint = fe.DirichletBC(funcSpace, fe.Constant(0.0), _on_boundary_dummy)
+        else:
+            boundCondAdjoint = []
+            for j in range(self._solutionDim):
+                boundCondAdjoint.append(fe.DirichletBC(funcSpace.sub(j),
+                                                       fe.Constant(0.0),
+                                                       _on_boundary_dummy))
 
         return boundCondsForward, boundCondAdjoint
+    
+    #-----------------------------------------------------------------------------------------------
+    def solve(self, 
+              formHandle: Callable, 
+              driftFunction: Callable, 
+              diffusionFunction: Callable,
+              convert=True) -> None:
+        
+        if not callable(formHandle):
+            raise TypeError("Form handle needs to be callable object (with 4 arguments).")
+        if not all(callable(func) for func in [driftFunction, diffusionFunction]):
+            raise TypeError("Drift and diffusion function must be callable objects.")
+
+        forwardVar = fe.TrialFunction(self.funcSpaceVar)
+        adjointVar = fe.TestFunction(self.funcSpaceVar)
+        driftVar = utils.pyfunc_to_fefunc(driftFunction, self.funcSpaceDrift)
+        diffusionVar = utils.pyfunc_to_fefunc(diffusionFunction, self.funcSpaceDiffusion)
+        solutionVar = fe.Function(self.funcSpaceVar)
+
+        weakForm = formHandle(forwardVar, driftVar, diffusionVar, adjointVar)
+        lhs = fe.lhs(weakForm)
+        rhs = fe.rhs(weakForm)
+        fe.solve(lhs == rhs, solutionVar, self.boundCondsForward)
+
+        solutionVec = solutionVar.vector()
+        if convert:
+            solutionVec = utils.reshape_to_np_format(solutionVec.get_local(), self._solutionDim)
+            solutionVec = utils.process_output_data(solutionVec)
+
+        return solutionVec
 
     #-----------------------------------------------------------------------------------------------   
     @property
@@ -321,7 +372,8 @@ class TransientFEMProblem(FEMProblem):
 
     #-----------------------------------------------------------------------------------------------
     def __init__(self, 
-                 dimension: int, 
+                 domainDim: int,
+                 solutionDim: int,
                  feSettings: dict[str, Any], 
                  simTimes: np.ndarray) -> None:
         """Constructor
@@ -338,7 +390,7 @@ class TransientFEMProblem(FEMProblem):
             ValueError: Checks that simulation time points are evenly spaced
         """
         
-        super().__init__(dimension, feSettings)
+        super().__init__(domainDim, solutionDim, feSettings)
         if not isinstance(simTimes, np.ndarray):
             raise TypeError("Need to provide simulation times as numpy array.")
         if not np.allclose(np.diff(simTimes), np.diff(simTimes)[0]):
@@ -436,7 +488,18 @@ class TransientFEMProblem(FEMProblem):
         functions.solve_transient(self._simTimeInds, self._solver, solveSettings, resultVec)
         if convert:
             resultVec = utils.tdv_to_nparray(resultVec)
-            resultVec = utils.process_output_data(resultVec)
+
+            if self._solutionDim > 1:
+                numXValues = int(self._funcSpaceVar.dim() / self._solutionDim)
+                resultVecStructured = np.zeros(numXValues, self._solutionDim, self._simTimes.size)
+
+                for i in range(self._simTimeInds):
+                    resultVecStructured[:, :, i] = utils.reshape_to_np_format(resultVec[:, i],
+                                                                              self._solutionDim)
+            else:
+                resultVecStructured = resultVec
+
+            resultVec = utils.process_output_data(resultVecStructured)
 
         return resultVec
 

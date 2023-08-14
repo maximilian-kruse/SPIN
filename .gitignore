@@ -207,4 +207,7 @@ pyrightconfig.json
 examples/*
 !examples/01_single_parameter.ipynb
 !examples/02_stationary.ipynb
-!example/03_transient.ipynb
+!examples/03_transient.ipynb
+!examples/04_met_moments.ipynb
+
+jitfailure*

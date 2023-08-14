@@ -76,7 +76,7 @@ class SDEInferenceModel:
             Gets prior mean function and point-wise variance field
     """
     
-    _problemDim = 1
+    _domainDim = 1
     _printWidth = 35
     _numericTol = fe.DOLFIN_EPS
     _inferenceOpts = ["drift", "diffusion", "all"]
@@ -196,12 +196,7 @@ class SDEInferenceModel:
             raise ValueError("Inference options are: " +  ', '.join(self._inferenceOpts))
         self.paramsToInfer = modelSettings["params_to_infer"]
         self.isStationary = modelSettings["is_stationary"]
-
-        modelOpts = forms.VariationalFormHandler.get_option_list()
-        if not modelSettings["model_type"] in modelOpts:
-            raise ValueError("Model options are: " + ', '.join(modelOpts))
-        modelType = modelSettings["model_type"]
-        self._weakForm = forms.VariationalFormHandler.get_form(modelType) 
+        self._weakForm, self._solutionDim = forms.get_form(modelSettings["model_type"]) 
         
         self._logger.print_centered("Invoke Inference Model", "=")
         self._logger.print_ljust("")
@@ -250,7 +245,7 @@ class SDEInferenceModel:
         if self.paramsToInfer == "diffusion" and not "drift_function" in feSettings.keys():
             raise ValueError("Need to specify drift for diffusion inference.")
 
-        femProblem = problems.FEMProblem(self._problemDim, feSettings)
+        femProblem = problems.FEMProblem(self._domainDim, self._solutionDim, feSettings)
         self.funcSpaces = self._set_up_funcspaces(femProblem)
         variationalForm = self._construct_variational_form(feSettings, femProblem)
 
@@ -364,17 +359,33 @@ class SDEInferenceModel:
         if self.isStationary:
             misfitFunctional = hl.PointwiseStateObservation(self.funcSpaces[hl.STATE],
                                                             misfitSettings["data_locations"])
-            misfitFunctional.d.set_local(misfitSettings["data_values"])
+
+            data = utils.reshape_to_fe_format(misfitSettings["data_values"])
+            misfitFunctional.d.set_local(data)
         else:
             if not "data_times" in misfitSettings.keys():
                 raise KeyError("Key 'data_times' missing for transient solve.")
-            settingsToPrint["num_times"] = misfitSettings["data_times"].size
+            numTimePoints = misfitSettings["data_times"].size
+            numSpacePoints = misfitSettings["data_locations"].size
+            settingsToPrint["num_times"] = numTimePoints
             misfitFunctional = \
                 transient.TransientPointwiseStateObservation(self.funcSpaces[hl.STATE],
-                                                             misfitSettings["data_locations"],
-                                                             misfitSettings["data_times"],
+                                                             numTimePoints,
+                                                             numSpacePoints,
                                                              self.simTimes)
-            misfitFunctional.d = misfitSettings["data_values"]
+            inputData = misfitSettings["data_values"]
+            if self._solutionDim > 1:
+                if not inputData.shape == (numSpacePoints, self._solutionDim, numTimePoints):
+                    raise ValueError("Data array has wrong shape.")
+                structuredData = np.array((numSpacePoints*self._solutionDim, numTimePoints))
+
+                for i in range(numTimePoints):
+                    structuredData[:, i] = utils.reshape_to_fe_format(inputData[:,:,i],
+                                                                      self._solutionDim)
+            else:
+                structuredData = inputData
+
+            misfitFunctional.d = structuredData
         
         self._logger.print_dict_to_file("Misfit Settings", settingsToPrint)  
         misfitFunctional.noise_variance = misfitSettings["data_std"]**2
@@ -588,14 +599,14 @@ class SDEInferenceModel:
     def _form_wrapper_all(self, forwardVar: Any, paramVar: Any, adjointVar: Any) -> Any:
         """Variational form wrapper for inference of drift and diffusion"""
 
-        numElems = int(0.5 * self._problemDim * (self._problemDim + 1)) + self._problemDim
+        numElems = int(0.5 * self._domainDim * (self._domainDim + 1)) + self._domainDim
         assert paramVar.ufl_shape[0] == numElems, \
             "Mixed parameter function has wrong shape"
 
-        if self._problemDim == 1:
+        if self._domainDim == 1:
             driftVar = fe.as_vector((paramVar[0],))
             diffVar = fe.as_matrix(((paramVar[1],),))
-        elif self._problemDim == 2:
+        elif self._domainDim == 2:
             driftVar = fe.as_vector((paramVar[0], paramVar[1]))
             diffVar = fe.as_matrix(((paramVar[2], paramVar[3]), (paramVar[3]), paramVar[4]))
 

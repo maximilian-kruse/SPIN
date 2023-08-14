@@ -13,7 +13,7 @@ nparray_to_tdv: Converts 2D numpy array into hIPPYlib time-dependent vector
 tdv_to_nparray: Reverses conversion
 pyfunc_to_fevec: Converts python callable into FEniCS vector
 pyfunc_to_fefunc: Converts python callable into FEniCS function
-reshape_fe_array: Reshapes FEniCS vector array for multiple variables
+reshape_to_np_format: Reshapes FEniCS vector array for multiple variables
 check_settings_dict: Checks settings dictionary against given prototype
 process_input_data: Processes numeric input data into uniform numpy format
 process_output_data: Processes numeric output data into uniform format
@@ -217,7 +217,7 @@ def pyfunc_to_fefunc(pyFuncHandle: Union[Callable, list[Callable]],
     return feFunc    
 
 #---------------------------------------------------------------------------------------------------
-def reshape_fe_array(flatArray: np.ndarray, numComponents: int) -> np.ndarray:
+def reshape_to_np_format(flatArray: np.ndarray, numComponents: int) -> np.ndarray:
     """Reshapes array from FEniCS vector into form suitable for multiple variables
 
     FEniCS vectors, even if deduced from multi-component functions, are always one-dimensional. The
@@ -245,9 +245,31 @@ def reshape_fe_array(flatArray: np.ndarray, numComponents: int) -> np.ndarray:
     arrayList = []
     for i in range(numComponents):
         arrayList.append(flatArray[i::numComponents])
-    reshapedArray = np.column_stack(arrayList)
+    structuredArray = np.column_stack(arrayList)
 
-    return reshapedArray
+    return structuredArray
+
+#---------------------------------------------------------------------------------------------------
+def reshape_to_fe_format(structuredArray: np.ndarray) -> np.ndarray:
+    if not isinstance(structuredArray, np.ndarray):
+        raise TypeError("Input needs to be numpy array.")
+    
+    numDims = structuredArray.ndim
+    if numDims > 2:
+        raise ValueError("Input array can at most be 2D")
+    if numDims == 1:
+        return structuredArray
+    
+    numComponents = structuredArray.shape[1]
+    if numComponents == 1:
+        return structuredArray.flatten()
+    
+    flatArray = np.zeros(structuredArray.size)
+
+    for i in range(structuredArray.ndim):
+        flatArray[i::numComponents] = structuredArray[:, i]
+
+    return flatArray
 
 #---------------------------------------------------------------------------------------------------
 def check_settings_dict(dictToTest: dict[str, Any], checkDict: dict[str, Any]) -> None:

@@ -17,14 +17,16 @@ VariationalFormHandler: Class holding Callables to implemented variational forms
 
 #====================================== Preliminary Commands =======================================
 import warnings
-from typing import Callable
+from typing import Callable, Tuple
+from abc import ABC, abstractmethod
 
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
     import fenics as fe
 
+
 #==================================== Variational Form Handler =====================================
-class VariationalFormHandler:
+class VariationalFormHandler(ABC):
     """Form handler class
 
     This class provides all forms in self-contained and side-effect free class methods. They can 
@@ -36,67 +38,39 @@ class VariationalFormHandler:
 
     NOTE: Other methods are form methods and can be displayed via get_option_list.
     """
-    
+
+    solutionDim = None
+  
     #-----------------------------------------------------------------------------------------------
-    @classmethod
-    def get_form(cls, modelType: str) -> Callable:
-        """Returns form callable with name of the input string
-
-        Args:
-            modelType (str): Form method name
-
-        Raises:
-            TypeError: Checks input string
-            AttributeError: Checks if form exists
-
-        Returns:
-            Callable: Call handle to form
-        """
-        if not isinstance(modelType, str):
-            raise TypeError("Model type needs to be given as string.")
-            
-        weakForm = getattr(cls, modelType, None)
-        if weakForm is None:
-            raise AttributeError("Cannot find given function " + modelType + ". "
-                                 "Possible options are: " + ', '.join(cls.get_option_list()))
+    @abstractmethod
+    def form(cls) -> fe.Form:
+        pass
         
-        return weakForm
 
-    #-----------------------------------------------------------------------------------------------
+
+#=========================================== Sub-Classes ===========================================
+#---------------------------------------------------------------------------------------------------
+class FokkerPlanckFormHandler(VariationalFormHandler):
+    solutionDim = 1
+
     @classmethod
-    def get_option_list(cls) -> list[str]:
-        """Returns all options for call handles
-
-        Returns:
-            list[str]: List of implemented form options
-
-        NOTE: If you implement a new method in this class that is not a form callable, you need to
-              register its name in the exception list below for the display to remain valid.
-              Otherwise the corresponding test will fail.
-        """
-        exceptionList = ['get_form', 'get_option_list']
-
-        optionList = [opt for opt in dir(cls) if opt.startswith('__') is False 
-                      and opt not in exceptionList]
-
-        return optionList
-
-    #-----------------------------------------------------------------------------------------------
-    @classmethod
-    def fokker_planck(cls, forwardVar: fe.Function, driftParam: fe.Function,
-                      squaredDiffusionParam: fe.Function, adjointVar: fe.Function) -> fe.Form:
+    def form(cls, forwardVar: fe.Function, driftParam: fe.Function,
+             squaredDiffusionParam: fe.Function, adjointVar: fe.Function) -> fe.Form:
         """Fokker Planck operator"""
 
         weakForm = fe.div(driftParam * forwardVar) * adjointVar * fe.dx \
-                 + 0.5 * fe.dot(fe.div(squaredDiffusionParam * forwardVar), fe.grad(adjointVar)) * fe.dx  \
-                 - fe.Constant(0) * adjointVar * fe.dx
+                 + 0.5 * fe.dot(fe.div(squaredDiffusionParam * forwardVar), fe.grad(adjointVar)) * fe.dx \
+                 + fe.Constant(0) * adjointVar * fe.dx
 
         return weakForm
 
-    #-----------------------------------------------------------------------------------------------
+#---------------------------------------------------------------------------------------------------
+class MeanExitTimeFormHandler(VariationalFormHandler):
+    solutionDim = 1
+
     @classmethod
-    def mean_exit_time(cls, forwardVar: fe.Function, driftParam: fe.Function,
-                       squaredDiffusionParam: fe.Function, adjointVar: fe.Function) -> fe.Form:
+    def form(cls, forwardVar: fe.Function, driftParam: fe.Function,
+             squaredDiffusionParam: fe.Function, adjointVar: fe.Function) -> fe.Form:
         """Mean exit time operator"""
 
         weakForm = fe.dot(driftParam * adjointVar, fe.grad(forwardVar)) * fe.dx \
@@ -104,3 +78,36 @@ class VariationalFormHandler:
                  + fe.Constant(1) * adjointVar * fe.dx
 
         return weakForm
+    
+#---------------------------------------------------------------------------------------------------
+class MeanExitTimeMomentsFormHandler(VariationalFormHandler):
+    solutionDim = 2
+
+    @classmethod
+    def form(cls, forwardVar: fe.Function, driftParam: fe.Function,
+             squaredDiffusionParam: fe.Function, adjointVar: fe.Function) -> fe.Form:
+        """Mean exit time operator"""
+
+        weak_form_1 = fe.dot(driftParam * adjointVar[0], fe.grad(forwardVar[0])) * fe.dx \
+                 - 0.5 * fe.dot(fe.div(squaredDiffusionParam * adjointVar[0]), fe.grad(forwardVar[0])) * fe.dx \
+                 + fe.Constant(1) * adjointVar[0] * fe.dx
+        weak_form_2 = fe.dot(driftParam * adjointVar[1], fe.grad(forwardVar[1])) * fe.dx \
+                 - 0.5 * fe.dot(fe.div(squaredDiffusionParam * adjointVar[1]), fe.grad(forwardVar[1])) * fe.dx \
+                 + 2 * forwardVar[0] * adjointVar[1] * fe.dx
+        weak_form_vec = weak_form_1 + weak_form_2
+    
+        return weak_form_vec
+
+#========================================= API Entry Point =========================================   
+def get_form(name: str) -> Tuple[Callable, int]:
+    match name:
+        case "fokker_planck":
+            FormHandler =  FokkerPlanckFormHandler
+        case "mean_exit_time":
+            FormHandler = MeanExitTimeFormHandler
+        case "mean_exit_time_moments":
+            FormHandler = MeanExitTimeMomentsFormHandler
+        case _:
+            raise NotImplementedError("The requested form is not implemented.")
+        
+    return FormHandler.form, FormHandler.solutionDim

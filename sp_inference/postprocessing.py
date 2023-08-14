@@ -41,7 +41,7 @@ import matplotlib.pyplot as plt
 import statsmodels.api as sm
 from .utilities import general as utils, logging
 
-plt.rcParams.update({"text.usetex": True})
+#plt.rcParams.update({"text.usetex": True})
 
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
