@@ -365,13 +365,13 @@ class SDEInferenceModel:
         else:
             if not "data_times" in misfitSettings.keys():
                 raise KeyError("Key 'data_times' missing for transient solve.")
-            numTimePoints = misfitSettings["data_times"].size
             numSpacePoints = misfitSettings["data_locations"].size
+            numTimePoints = misfitSettings["data_times"].size
             settingsToPrint["num_times"] = numTimePoints
             misfitFunctional = \
                 transient.TransientPointwiseStateObservation(self.funcSpaces[hl.STATE],
-                                                             numTimePoints,
-                                                             numSpacePoints,
+                                                             misfitSettings["data_locations"],
+                                                             misfitSettings["data_times"],
                                                              self.simTimes)
             inputData = misfitSettings["data_values"]
             if self._solutionDim > 1:
