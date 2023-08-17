@@ -11,6 +11,4 @@ dependencies:
   - jupyter
   - pre-commit
   - pytest
-  pip:
-    - hippylib
-    - git+https://github.com/hippylib/hippylib2muq.git
+  - h5py
