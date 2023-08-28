@@ -4,7 +4,7 @@
 import warnings
 import pytest
 import numpy as np
-from typing import Any, Callable, Tuple
+from typing import Any, Tuple
 
 import sp_inference.utilities.general as utils
 import sp_inference.pde_problems.forms as femForms
@@ -13,7 +13,6 @@ import sp_inference.pde_problems.problems as femProblems
 
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
-    import ufl
     import fenics as fe
     import hippylib as hl
 
@@ -31,7 +30,8 @@ class TestData:
     startTime = 0.1
     endTime = 1.1
     timeStepSize = 0.1
-    initSol = lambda x: np.exp(-np.square(x))
+    def initSol(x):
+        return np.exp(-np.square(x))
     simTimes = np.arange(startTime, endTime+timeStepSize, timeStepSize)
 
     feSettings = {"num_mesh_points": numMeshPoints,
@@ -181,8 +181,10 @@ def test_transient_fem_problem() -> None:
                                               TestData.solutionDim,
                                               TestData.feSettings, 
                                               TestData.simTimes)
-    driftFunc = lambda x: -x
-    diffusionFunc = lambda x: np.ones(x.size)
+    def driftFunc(x):
+        return -x
+    def diffusionFunc(x):
+        return np.ones(x.size)
     varFormFunc, _ = femForms.get_form('fokker_planck')
 
     problem.assemble(varFormFunc, driftFunc, diffusionFunc)

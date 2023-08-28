@@ -14,12 +14,14 @@ SDEInferenceModel: Wrapper class for stochastic process inference
 
 #====================================== Preliminary Commands =======================================
 import warnings
-import numpy as np
 from typing import Any, Callable, Optional, Tuple, Union
 
-from . import transient
+import numpy as np
+
 from ..pde_problems import forms, problems
-from ..utilities import general as utils, logging
+from ..utilities import general as utils
+from ..utilities import logging
+from . import transient
 
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
@@ -110,8 +112,7 @@ class SDEInferenceModel:
     _checkDictMisfit = {
         "data_locations": ((int, float, np.ndarray), None, False),
         "data_times": ((int, float, np.ndarray), None, True),
-        "data_values": ((int, float, np.ndarray), None, False),
-        "data_std": ((int, float), [_numericTol, 1e10], False)
+        "data_values": ((int, float, np.ndarray), None, False)
     }
 
     _checkDictSolver = {
@@ -192,7 +193,7 @@ class SDEInferenceModel:
 
         utils.check_settings_dict(modelSettings, self._checkDictModel)
 
-        if not modelSettings["params_to_infer"] in self._inferenceOpts:
+        if modelSettings["params_to_infer"] not in self._inferenceOpts:
             raise ValueError("Inference options are: " +  ', '.join(self._inferenceOpts))
         self.paramsToInfer = modelSettings["params_to_infer"]
         self.isStationary = modelSettings["is_stationary"]
@@ -240,9 +241,9 @@ class SDEInferenceModel:
         self._logger.print_ljust("Construct PDE Problem:", width=self._printWidth, end="")
         self._logger.print_dict_to_file("FEM Problem Settings", feSettings)
 
-        if self.paramsToInfer == "drift" and not "squared_diffusion_function" in feSettings.keys():
+        if self.paramsToInfer == "drift" and "squared_diffusion_function" not in feSettings.keys():
             raise ValueError("Need to specify diffusion for drift inference.")
-        if self.paramsToInfer == "diffusion" and not "drift_function" in feSettings.keys():
+        if self.paramsToInfer == "diffusion" and "drift_function" not in feSettings.keys():
             raise ValueError("Need to specify drift for diffusion inference.")
 
         femProblem = problems.FEMProblem(self._domainDim, self._solutionDim, feSettings)
@@ -353,26 +354,25 @@ class SDEInferenceModel:
 
         utils.check_settings_dict(misfitSettings, self._checkDictMisfit)
         self._logger.print_ljust("Construct Misfit:", width=self._printWidth, end="")     
-        settingsToPrint = {"data_std": misfitSettings["data_std"],
-                           "num_points": misfitSettings["data_locations"].size}
         
         if self.isStationary:
             misfitFunctional = hl.PointwiseStateObservation(self.funcSpaces[hl.STATE],
-                                                            misfitSettings["data_locations"])
+                                                            misfitSettings["data_locations"],
+                                                            misfitSettings["data_var"])
 
             data = utils.reshape_to_fe_format(misfitSettings["data_values"])
             misfitFunctional.d.set_local(data)
         else:
-            if not "data_times" in misfitSettings.keys():
+            if "data_times" not in misfitSettings.keys():
                 raise KeyError("Key 'data_times' missing for transient solve.")
             numSpacePoints = misfitSettings["data_locations"].size
             numTimePoints = misfitSettings["data_times"].size
-            settingsToPrint["num_times"] = numTimePoints
             misfitFunctional = \
                 transient.TransientPointwiseStateObservation(self.funcSpaces[hl.STATE],
                                                              misfitSettings["data_locations"],
                                                              misfitSettings["data_times"],
-                                                             self.simTimes)
+                                                             self.simTimes,noiseVar
+                                                             =misfitSettings["data_var"])
             inputData = misfitSettings["data_values"]
             if self._solutionDim > 1:
                 if not inputData.shape == (numSpacePoints, self._solutionDim, numTimePoints):
@@ -384,11 +384,8 @@ class SDEInferenceModel:
                                                                       self._solutionDim)
             else:
                 structuredData = inputData
-
             misfitFunctional.d = structuredData
         
-        self._logger.print_dict_to_file("Misfit Settings", settingsToPrint)  
-        misfitFunctional.noise_variance = misfitSettings["data_std"]**2
         assert isinstance(misfitFunctional, hl.Misfit), \
             "Misfit functional has not been constructed correctly."
 
