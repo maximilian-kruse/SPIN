@@ -40,4 +40,5 @@ Example processes for artificial data generation.
 from .inference import model, sampling, transient
 from .pde_problems import forms, functions, problems
 from .utilities import general, interpolation, logging
-from . import postprocessing, processes
+from .postprocessing import data_types, visualization
+from . import processes

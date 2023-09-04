@@ -9,12 +9,12 @@ Logger: Logging class
 """
 
 #====================================== Preliminary Commands =======================================
-from datetime import time
+import inspect
 import os
 import warnings
-import inspect
+from typing import Any, Optional, Tuple
+
 import numpy as np
-from typing import Any, Optional, Tuple, Union
 
 from . import general as utils
 
@@ -231,7 +231,7 @@ class Logger:
                                      x-y-pairs
         """
 
-        if not paramsToInfer in self._inferenceOpts:
+        if paramsToInfer not in self._inferenceOpts:
             raise ValueError("Inference options are: " +  ', '.join(self._inferenceOpts))
         if paramsToInfer == "all":
             numParams = 2
@@ -239,7 +239,7 @@ class Logger:
             numParams = 1
 
         if not isStationary:
-            if not "simulation_times" in dataStructs.keys():
+            if "simulation_times" not in dataStructs.keys():
                 raise KeyError("Need to provide simulation times for logging of transient solution.")
             simTimes = dataStructs["simulation_times"]
 
