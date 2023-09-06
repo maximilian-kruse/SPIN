@@ -39,7 +39,7 @@ from scipy.integrate import quad, cumulative_trapezoid
 
 from .pde_problems import forms as femForms, problems as femProblems
 from .utilities import general as utils, interpolation as interp, logging
-
+from hippylib.utils import fenics_enhancer as fee
 
 #============================================ Base Class ===========================================
 class BaseProcess(ABC):
@@ -416,12 +416,12 @@ class BaseProcess(ABC):
         """
 
         utils.check_settings_dict(feSettings, self._checkDictFE)
-        utils.check_settings_dict(solverSettings, self._checkDictTransient)
 
         tStart = solverSettings["start_time"]
         tEnd = solverSettings["end_time"]
         dt = solverSettings["time_step_size"]
-        initFunc = solverSettings["initial_condition"]
+        initFunc = fee.convert_to_np_callable(solverSettings["initial_condition"],
+                                              self._domainDim)
         simTimePoints = np.arange(tStart, tEnd+dt, dt)
         
         femFormHandle, solutionDim = femForms.get_form("fokker_planck")

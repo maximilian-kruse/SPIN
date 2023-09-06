@@ -255,11 +255,11 @@ class SDEInferenceModel:
                                                   femProblem.boundCondAdjoint,
                                                   is_fwd_linear=True)
         else:
-            utils.check_settings_dict(transientSettings, self._checkDictTransient)
             tStart = transientSettings["start_time"]
             tEnd = transientSettings["end_time"]
             dt = transientSettings["time_step_size"]
-            initFunc = transientSettings["initial_condition"]
+            initFunc = fee.convert_to_np_callable(transientSettings["initial_condition"],
+                                                  self._domainDim)
             self.simTimes = np.arange(tStart, tEnd+dt, dt)
 
             pdeProblem = transient.TransientPDEVariationalProblem(self.funcSpaces, 

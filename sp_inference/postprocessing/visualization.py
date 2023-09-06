@@ -524,11 +524,16 @@ class PlottingFunctions:
 
 #======================================= Plot Hessian Data =========================================
 def plot_hessian_data(eigenvalues: np.ndarray, path_name: str) -> None:
-    x_values = np.indices(eigenvalues) + 1
+    eigenvalues = np.squeeze(eigenvalues)
+    if not eigenvalues.ndim == 1:
+        raise ValueError(f"Hessian eigenvalues must be 1D array, "
+                         f"but dimension is {eigenvalues.ndim}.")
+    x_values = np.indices((eigenvalues.size,)) + 1
     fig, ax = plt.subplots(figsize=(5, 5))
     ax.set_title('Hessian eigenvalues')
-    ax.xet_xlabel(r'i')
-    ax.xet_ylabel(r'\lambda (i)')
+    ax.set_xlabel(r'$i$')
+    ax.set_ylabel(r'$\lambda_i$')
+    ax.set_yscale("log")
     ax.scatter(x_values, eigenvalues, color='firebrick')
     ax.axhline(y=1)
     fig.savefig(os.path.join(path_name, 'hessian_eigenvalues.pdf'))
