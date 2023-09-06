@@ -18,6 +18,7 @@ from typing import Any, Callable, Optional, Tuple, Union
 
 import numpy as np
 
+import hippylib.utils.fenics_enhancer as fee
 from ..pde_problems import forms, problems
 from ..utilities import general as utils
 from ..utilities import logging
@@ -95,8 +96,6 @@ class SDEInferenceModel:
 
     _checkDictPrior = {
         "mean_function": ((Callable, list), None, False),
-        "gamma": ((int, float), [_numericTol, 1e10], False),
-        "delta": ((int, float), [_numericTol, 1e10], False),
         "robin_bc": (bool, None, False)
     }
 
@@ -237,7 +236,6 @@ class SDEInferenceModel:
             hl.PDEProblem: PDE variational problem
         """
 
-        utils.check_settings_dict(feSettings, self._checkDictFE)
         self._logger.print_ljust("Construct PDE Problem:", width=self._printWidth, end="")
         self._logger.print_dict_to_file("FEM Problem Settings", feSettings)
 
@@ -303,7 +301,6 @@ class SDEInferenceModel:
             hl.modeling.prior.SqrtPrecisionPDE_Prior: Hippylib prior object
         """
 
-        utils.check_settings_dict(priorSettings, self._checkDictPrior)
         self._logger.print_ljust("Construct Prior:", width=self._printWidth, end="")
         self._logger.print_dict_to_file("Prior Settings", priorSettings)       
         
@@ -311,13 +308,18 @@ class SDEInferenceModel:
         if funcSpaceParam.num_sub_spaces() == 1:
             funcSpaceParam = funcSpaceParam.extract_sub_space([0]).collapse()
 
-        priorMeanVec = utils.pyfunc_to_fevec(priorSettings["mean_function"],
-                                             funcSpaceParam)
+        priorMeanFunc = fee.convert_to_fe_function(priorSettings["mean_function"],
+                                                   funcSpaceParam)
+        gamma, delta = hl.BiLaplacianComputeCoefficients(priorSettings["variance"],
+                                                         priorSettings["correlation_length"],
+                                                         funcSpaceParam)
+
         prior = hl.BiLaplacianPrior(funcSpaceParam,
-                                    priorSettings["gamma"],
-                                    priorSettings["delta"],
-                                    mean=priorMeanVec,
-                                    robin_bc=priorSettings["robin_bc"])
+                                    gamma,
+                                    delta,
+                                    mean=priorMeanFunc.vector(),
+                                    robin_bc=priorSettings["robin_bc"],
+                                    robin_const=priorSettings["robin_bc_const"])
 
         assert isinstance(prior, hl.modeling.prior.SqrtPrecisionPDE_Prior), \
             "Prior has not been constructed correctly."
@@ -433,7 +435,6 @@ class SDEInferenceModel:
                                      and reduced Hessian eigenvalues
         """
 
-        utils.check_settings_dict(solverSettings, self._checkDictSolver)
         utils.check_settings_dict(hessianSettings, self._checkDictHessian)
         self._logger.print_centered("Conduct Linearized Inference", "=")
         self._logger.print_ljust("")
@@ -470,7 +471,7 @@ class SDEInferenceModel:
         return mapMeanData, mapVarianceData, mapForwardData, hessEigVals
 
     #-----------------------------------------------------------------------------------------------
-    def check_gradient(self, paramFunc: Callable) -> fe.Function:
+    def check_gradient(self, paramFunc: str) -> fe.Function:
         """Computes the gradient of the PDE constraint form w.r.t. a given parameter function
 
         This method may be used to check the feasibility of the gradient computation, as well as to
@@ -488,7 +489,8 @@ class SDEInferenceModel:
 
         forwardVec = self.inferenceModel.generate_vector(hl.STATE)
         adjointVec = self.inferenceModel.generate_vector(hl.ADJOINT)
-        paramVec = utils.pyfunc_to_fevec(paramFunc, self.funcSpaces[hl.PARAMETER])
+        paramFunc = fee.convert_to_fe_function(paramFunc, self.funcSpaces[hl.PARAMETER])
+        paramVec = paramFunc.vector()
 
         self.inferenceModel.solveFwd(forwardVec, [None, paramVec, None])
         self.inferenceModel.solveAdj(adjointVec, [forwardVec, paramVec, None])
@@ -566,12 +568,14 @@ class SDEInferenceModel:
         """
 
         if self.paramsToInfer == "drift":
-            self._fixedParamFunction = utils.pyfunc_to_fefunc(feSettings["squared_diffusion_function"],
-                                                              femProblem.funcSpaceDiffusion)
+            diff_func = fee.convert_to_fe_function(feSettings["squared_diffusion_function"],
+                                                   femProblem.funcSpaceDiffusion)
+            self._fixedParamFunction = diff_func
             return  self._form_wrapper_drift
         elif self.paramsToInfer == "diffusion":
-            self._fixedParamFunction = utils.pyfunc_to_fefunc(feSettings["drift_function"],
-                                                              femProblem.funcSpaceDrift)
+            drift_func = fee.convert_to_fe_function(feSettings["drift_function"],
+                                                   femProblem.funcSpaceDrift)
+            self._fixedParamFunction = drift_func
             return  self._form_wrapper_diffusion
         elif self.paramsToInfer == "all":
             return self._form_wrapper_all
@@ -620,8 +624,9 @@ class SDEInferenceModel:
         self._logger.print_ljust("Solve for MAP:")
 
         if "initial_guess" in solverSettings.keys():
-            initParam = utils.pyfunc_to_fevec(solverSettings["initial_guess"],
-                                              self.funcSpaces[hl.PARAMETER])
+            initFunc = fee.convert_to_fe_function(solverSettings["initial_guess"],
+                                                  self.funcSpaces[hl.PARAMETER])
+            initParam = initFunc.vector()
         else:
             initParam = self.prior.mean.copy()
 
