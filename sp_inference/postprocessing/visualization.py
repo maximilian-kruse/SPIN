@@ -8,7 +8,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from multimethod import multimethod
 
-import data_types as dt
+from . import data_types as dt
 
 sns.set_theme(style="ticks")
 
@@ -520,6 +520,18 @@ class PlottingFunctions:
         handle.make_axis_legend(label,
                                (np.min(x_values), np.max(x_values)),
                                (np.min(y_values), np.max(y_values)))
+
+
+#======================================= Plot Hessian Data =========================================
+def plot_hessian_data(eigenvalues: np.ndarray, path_name: str) -> None:
+    x_values = np.indices(eigenvalues) + 1
+    fig, ax = plt.subplots(figsize=(5, 5))
+    ax.set_title('Hessian eigenvalues')
+    ax.xet_xlabel(r'i')
+    ax.xet_ylabel(r'\lambda (i)')
+    ax.scatter(x_values, eigenvalues, color='firebrick')
+    ax.axhline(y=1)
+    fig.savefig(os.path.join(path_name, 'hessian_eigenvalues.pdf'))
 
 
 #=========================================== Utilities =============================================
