@@ -336,7 +336,7 @@ class Visualizer:
         y_values = values
         handle = self._figure_collection.figure_handles[component][timestamp][0]
         handle.file_name["suffix"] = "mean_ci"
-        handle.title["suffix"] = "mean and opt. 95% CI" 
+        handle.title["suffix"] = "mean and opt. CI" 
         handle.make_axis_title()
 
         if is_point_data:
