@@ -35,7 +35,7 @@ class ColorControl:
 #======================================== Custom MPL Figure ========================================
 class MatplotlibFigure:
     def __init__(self, file_type: Optional[str] = "pdf") -> None:
-        self.fig, self.axis = plt.subplots(figsize=(5, 5))
+        self.fig, self.axis = plt.subplots(figsize=(5, 5), layout="constrained")
         self.title = {"prefix": None, "component": None, "timestamp": None, "suffix": None}
         self.file_name = {"prefix": None, "component": None, "timestamp": None, "suffix": None}
         self.title_is_set = False
@@ -496,7 +496,7 @@ class PlottingFunctions:
         handle.fig.colorbar(plot2D)
         handle.make_axis_legend(label,
                                (np.min(x_values), np.max(x_values)),
-                               (np.min(y_values), np.max(y_values)))    
+                               (np.min(y_values), np.max(y_values)))
 
     #-----------------------------------------------------------------------------------------------
     @staticmethod
@@ -519,7 +519,7 @@ class PlottingFunctions:
         handle.fig.colorbar(plot2D)
         handle.make_axis_legend(label,
                                (np.min(x_values), np.max(x_values)),
-                               (np.min(y_values), np.max(y_values)))
+                               (np.min(y_values), np.max(y_values)))    
 
 
 #======================================= Plot Hessian Data =========================================
@@ -529,7 +529,7 @@ def plot_hessian_data(eigenvalues: np.ndarray, path_name: str) -> None:
         raise ValueError(f"Hessian eigenvalues must be 1D array, "
                          f"but dimension is {eigenvalues.ndim}.")
     x_values = np.indices((eigenvalues.size,)) + 1
-    fig, ax = plt.subplots(figsize=(5, 5))
+    fig, ax = plt.subplots(figsize=(5, 5), layout="constrained")
     ax.set_title('Hessian eigenvalues')
     ax.set_xlabel(r'$i$')
     ax.set_ylabel(r'$\lambda_i$')
@@ -537,7 +537,7 @@ def plot_hessian_data(eigenvalues: np.ndarray, path_name: str) -> None:
     ax.scatter(x_values, eigenvalues, color='firebrick')
     ax.axhline(y=1)
     fig.savefig(os.path.join(path_name, 'hessian_eigenvalues.pdf'))
-
+    
 
 #=========================================== Utilities =============================================
 def check_inference_data_list(inference_data_list: Iterable[dt.InferenceData]) -> tuple[int]:
