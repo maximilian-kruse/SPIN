@@ -21,6 +21,7 @@ from . import model
 from ..utilities import general as utils, logging
 import muq.Modeling as mm
 import muq.SamplingAlgorithms as ms
+import statsmodels.api as sm
 
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
@@ -396,4 +397,21 @@ class QOISquaredNorm(BaseQOI):
                 form += paramVec[i] * paramVec[i] * fe.dx
 
         return form
-  
+
+
+#================================= Compute Diagnostics from QOI ====================================
+def postprocess_qoi(logger, qoiTrace: np.ndarray, maxLag: int) -> None:
+        logger.print_ljust("Postprocess QOI Data:", end="\n\n")
+        average = np.mean(qoiTrace)
+        autoCorrTime, _, _ = hl.integratedAutocorrelationTime(qoiTrace, max_lag=maxLag)
+        effSampleSize = qoiTrace.size / autoCorrTime
+        
+        logger.print_ljust(f"{'Mean Value:':<25}{average:<6.1f}")  
+        logger.print_ljust(f"{'Autocorrelation length:':<25}{autoCorrTime:<6.1f}")
+        logger.print_ljust(f"{'Effective sample size:':<25}{effSampleSize:<6.1f}")
+
+        autoCorrFunc, confInt = sm.tsa.stattools.acf(qoiTrace, nlags=maxLag, alpha=.1, fft=False)
+        lowerConfBound = confInt.T[0]
+        upperConfBound = confInt.T[1]
+
+        return autoCorrFunc, [lowerConfBound, upperConfBound]

@@ -522,7 +522,9 @@ class PlottingFunctions:
                                (np.min(y_values), np.max(y_values)))    
 
 
-#======================================= Plot Hessian Data =========================================
+#=================================== Standalone Plot Functions =====================================
+
+#---------------------------------------------------------------------------------------------------
 def plot_hessian_data(eigenvalues: np.ndarray, path_name: str) -> None:
     eigenvalues = np.squeeze(eigenvalues)
     if not eigenvalues.ndim == 1:
@@ -537,6 +539,45 @@ def plot_hessian_data(eigenvalues: np.ndarray, path_name: str) -> None:
     ax.scatter(x_values, eigenvalues, color='firebrick')
     ax.axhline(y=1)
     fig.savefig(os.path.join(path_name, 'hessian_eigenvalues.pdf'))
+
+#---------------------------------------------------------------------------------------------------
+def plot_qoi_data(qoi_trace: np.ndarray,
+                  acf: np.ndarray,
+                  acf_interval: Iterable[np.ndarray],
+                  path_name: str) -> None:
+    if not (len(acf_interval) == 2 and acf_interval[0].size == acf_interval[1].size):
+        raise ValueError("ACF interval needs to be provided as 2 arrays of the same size")
+    if not acf.size == acf_interval[0].size:
+        raise ValueError("ACF and ACF interval need to have the same size.")
+    
+    qoi_inds = (np.indices((qoi_trace.size,)) + 1).flatten()
+    acf_inds = (np.indices((acf.size,)) + 1).flatten()
+    qoi_counts, qoi_bins = np.histogram(qoi_trace, bins=20)
+
+    fig, ax = plt.subplots(figsize=(5, 5), layout="constrained")
+    ax.set_title('QOI trace')
+    ax.set_xlabel(r'$n$')
+    ax.set_ylabel(r'$QOI(n)$')
+    ax.scatter(qoi_inds, qoi_trace, color='royalblue', alpha=0.5)
+    fig.savefig(os.path.join(path_name, 'qoi_trace.png'))
+
+    fig, ax = plt.subplots(figsize=(5, 5), layout="constrained")
+    ax.set_title('QOI Histogram')
+    ax.set_xlabel(r'$Bin$')
+    ax.set_ylabel(r'$Count$')
+    ax.stairs(qoi_counts, qoi_bins, fill=True)
+    fig.savefig(os.path.join(path_name, 'qoi_histogram.pdf'))
+
+    fig, ax = plt.subplots(figsize=(5, 5), layout="constrained")
+    ax.set_title('Autocorrelation Function')
+    ax.set_xlabel(r'$n$')
+    ax.set_ylabel(r'$ACF(n)$')
+    ax.plot(acf_inds, acf, color='royalblue')
+    ax.fill_between(acf_inds, acf_interval[0], acf_interval[1], color='royalblue', alpha=0.25)
+    ax.axhline(y=0)
+    fig.savefig(os.path.join(path_name, 'qoi_acf.pdf'))
+
+    
     
 
 #=========================================== Utilities =============================================
