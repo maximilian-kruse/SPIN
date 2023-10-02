@@ -5,6 +5,7 @@ dependencies:
   - fenics
   - muq
   - scipy
+  - sympy
   - matplotlib
   - seaborn
   - statsmodels
