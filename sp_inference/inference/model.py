@@ -568,8 +568,11 @@ class SDEInferenceModel:
         """
 
         if self.paramsToInfer == "drift":
-            diff_func = fee.convert_to_fe_function(feSettings["squared_diffusion_function"],
-                                                   femProblem.funcSpaceDiffusion)
+            diff_array = fee.convert_to_np_array(feSettings["squared_diffusion_function"],
+                                                 femProblem.funcSpaceDiffusion)
+            diff_array = np.exp(diff_array)
+            diff_func = fee.create_fe_function_from_np_array(diff_array,
+                                                             femProblem.funcSpaceDiffusion)
             self._fixedParamFunction = diff_func
             return  self._form_wrapper_drift
         elif self.paramsToInfer == "diffusion":
@@ -606,10 +609,11 @@ class SDEInferenceModel:
 
         if self._domainDim == 1:
             driftVar = fe.as_vector((paramVar[0],))
-            diffVar = fe.as_matrix(((paramVar[1],),))
+            diffVar = fe.as_matrix(((fe.exp(paramVar[1]),),))
         elif self._domainDim == 2:
             driftVar = fe.as_vector((paramVar[0], paramVar[1]))
-            diffVar = fe.as_matrix(((paramVar[2], paramVar[3]), (paramVar[3]), paramVar[4]))
+            diffVar = fe.as_matrix(((fe.exp(paramVar[2]), fe.exp(paramVar[3])),
+                                    (fe.exp(paramVar[3]), fe.exp(paramVar[4]))))
 
         return self._weakForm(forwardVar, driftVar, diffVar, adjointVar)
                

@@ -111,3 +111,4 @@ def get_form(name: str) -> Tuple[Callable, int]:
             raise NotImplementedError("The requested form is not implemented.")
         
     return FormHandler.form, FormHandler.solutionDim
+    
