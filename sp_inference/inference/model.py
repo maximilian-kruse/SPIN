@@ -373,7 +373,8 @@ class SDEInferenceModel:
                 transient.TransientPointwiseStateObservation(self.funcSpaces[hl.STATE],
                                                              misfitSettings["data_locations"],
                                                              misfitSettings["data_times"],
-                                                             self.simTimes,noiseVar
+                                                             self.simTimes,
+                                                             noiseVar
                                                              =misfitSettings["data_var"])
             inputData = misfitSettings["data_values"]
             if self._solutionDim > 1:

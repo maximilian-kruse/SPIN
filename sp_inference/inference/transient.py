@@ -37,6 +37,7 @@ from ..utilities import general as utils
 
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
+    import dolfin as dl
     import fenics as fe
     import hippylib as hl
 
@@ -75,7 +76,7 @@ class TransientPointwiseStateObservation(hl.Misfit):
                  obsTimes: Union[int, float, np.ndarray],
                  simTimes: np.ndarray,
                  data: Optional[Union[hl.TimeDependentVector, np.ndarray]]=None,
-                 noiseVar: Optional[float]=None) -> None:
+                 noiseVar: Optional[Union[float, np.ndarray]]=None) -> None:
         """Constructor
 
         Prepares computations, constructs mapping from data time points to simulation time grid.
@@ -111,6 +112,9 @@ class TransientPointwiseStateObservation(hl.Misfit):
         if not isinstance(funcSpace, fe.FunctionSpace):
             raise TypeError("Function space needs to be proper FEniCS object.")
 
+        num_subspaces = funcSpace.num_sub_spaces()
+        self.num_components = (1 if num_subspaces == 0 else num_subspaces)
+        self.num_observations = obsPoints.shape[0]
         self._data = None
         self._noiseVar = None
         self._obsTimes = obsTimes
@@ -118,18 +122,19 @@ class TransientPointwiseStateObservation(hl.Misfit):
         self._dt = simTimes[1] - simTimes[0]
         self._simTimeInds = np.indices(simTimes.shape).flatten()
         self._obsTimeInds = np.indices(obsTimes.shape).flatten()
-
+        
+        self.C = self._assemble_precision_matrices(noiseVar)
         self._obsMap = self._project_obs_to_sim_grid()
         self._projMat = hl.pointwiseObservation.assemblePointwiseObservation(funcSpace, obsPoints)
         self._currentFullState = fe.Vector()
         self._currentProjState = fe.Vector()
+        self._CBu = fe.Vector()
         self._projMat.init_vector(self._currentFullState, 1)
         self._projMat.init_vector(self._currentProjState, 0)
+        self._projMat.init_vector(self._CBu, 0)
 
         if data is not None:
             self.d = data
-        if noiseVar is not None:
-            self.noise_variance = noiseVar
 
     #-----------------------------------------------------------------------------------------------
     def cost(self, stateList: list) -> float:
@@ -157,12 +162,12 @@ class TransientPointwiseStateObservation(hl.Misfit):
         for i in self._simTimeInds:
             currentFwdVar = stateList[hl.STATE].data[i]
 
-            for currentData in self.d[i]:
+            for currentData, C in zip(self.d[i], self._precision[i]):
                 self._projMat.mult(currentFwdVar, self._currentProjState)     
                 self._currentProjState.axpy(-1., currentData)
-                cost += self._currentProjState.inner(self._currentProjState)
+                C.mult(self._currentProjState, self._CBu)
+                cost += 0.5 * self._currentProjState.inner(self._CBu)
 
-        cost *= 1./ (2*self.noise_variance)
         return cost
 
     #-----------------------------------------------------------------------------------------------
@@ -190,7 +195,7 @@ class TransientPointwiseStateObservation(hl.Misfit):
             TypeError: Checks type of output vector
         """
 
-        if not varInd in [hl.STATE, hl.PARAMETER]:
+        if varInd not in [hl.STATE, hl.PARAMETER]:
             raise ValueError("Invalid value for index argument.")
         if not (isinstance(stateList, list) and len(stateList) == 3):
             raise TypeError("States have to be given as list with three entries.")
@@ -208,13 +213,14 @@ class TransientPointwiseStateObservation(hl.Misfit):
             for i in self._simTimeInds:
                 currentFwdVar = stateList[hl.STATE].data[i]
 
-                for currentData in self.d[i]:
+                for currentData, C in zip(self.d[i], self._precision[i]):
                     self._projMat.mult(currentFwdVar, self._currentProjState)    
                     self._currentProjState.axpy(-1., currentData)
-                    self._projMat.transpmult(self._currentProjState, self._currentFullState)
+                    C.mult(self._currentProjState, self._CBu)
+                    self._projMat.transpmult(self._CBu, self._currentFullState)
                     outVec.data[i].axpy(1, self._currentFullState)
 
-                outVec.data[i] *= 1./(self.noise_variance * self._dt)
+                outVec.data[i] *= 1./ self._dt
         else:
             pass
 
@@ -275,14 +281,13 @@ class TransientPointwiseStateObservation(hl.Misfit):
                 raise TypeError("Output vector needs to be TDV over simulation times.")
 
             for i in self._simTimeInds:
-                currentObsTimeInds = self._obsMap[i]
                 currentFwdVar = direction.data[i]
-                numObs = currentObsTimeInds.size
 
-                if numObs > 0:
+                for C in self._precision[i]:
                     self._projMat.mult(currentFwdVar, self._currentProjState)
-                    self._projMat.transpmult(self._currentProjState, outVec.data[i])
-                    outVec.data[i] *= numObs/(self.noise_variance * self._dt)
+                    C.mult(self._currentProjState, self._CBu)
+                    self._projMat.transpmult(self._CBu, outVec.data[i])
+                    outVec.data[i] *= 1 / self._dt
         else:
             pass
 
@@ -319,15 +324,33 @@ class TransientPointwiseStateObservation(hl.Misfit):
             "Time points of the given vector need to match observation times."
 
         effDataVec = []
+        effNoiseVar = []
         for indSim in self._simTimeInds:
             obsTimeInds = self._obsMap[indSim]
 
             currentObs = []
+            currentVars = []
             for indObs in obsTimeInds:
                 currentObs.append(obsVec.data[indObs])
+                currentVars.append(self.C[indObs])
             effDataVec.append(currentObs)
+            effNoiseVar.append(currentVars)
 
-        return effDataVec
+        return effDataVec, effNoiseVar
+    
+    #-----------------------------------------------------------------------------------------------
+    def _assemble_precision_matrices(self, noiseVar: Union[np.ndarray]) -> list[dl.PETScMatrix]:
+        precision_matrix_list = []
+        num_time_steps = self._obsTimeInds.shape[0]
+        
+        for i in range(num_time_steps):
+            if isinstance(noiseVar, float):
+                current_noise = noiseVar
+            elif isinstance(noiseVar, np.ndarray):
+                current_noise = noiseVar[i, :]
+            precision_matrix = self._assemble_precision_matrix(current_noise)
+            precision_matrix_list.append(precision_matrix)
+        return precision_matrix_list
 
     #-----------------------------------------------------------------------------------------------
     @property
@@ -349,7 +372,7 @@ class TransientPointwiseStateObservation(hl.Misfit):
             data = utils.nparray_to_tdv(self._obsTimes, data)
         elif not isinstance(data, hl.TimeDependentVector):
             raise TypeError("Data needs to be given as numpy array or hIPPYlib TDV.")
-        self._data = self._assign_obs_to_sim_intervals(data)
+        self._data, self._precision = self._assign_obs_to_sim_intervals(data)
 
     @noise_variance.setter
     def noise_variance(self, noiseVar: float) -> None:
