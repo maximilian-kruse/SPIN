@@ -289,7 +289,7 @@ class MCMCSampler:
         elif samplerSettings["algorithm"] == "MALA":
             if "StepSize" not in samplerSettings.keys():
                 raise KeyError("Need to provide a value for setting 'StepSize' when using MALA.")
-            propFunc = ms.MALAProposal
+            propFunc = ms.InfMALAProposal
             useZeroMean = True
         else:
             raise ValueError("Unknown option for algorithm, supported are 'pCN' and 'MALA'.")
