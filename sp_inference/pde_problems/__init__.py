@@ -2,7 +2,7 @@
 
 The pde_problem subpackage provides "classical" FEM capabilities for setting up the PDE problem for
 the Bayesian inference. These structures are used for the actual inference procedure, as well as for
-artificial data generation. For more detailed information, please refer to the respective modules. 
+artificial data generation. For more detailed information, please refer to the respective modules.
 
 Modules:
 ========

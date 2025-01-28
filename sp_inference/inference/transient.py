@@ -1,4 +1,4 @@
-""" Core Module for Transient Inference Problems
+"""Core Module for Transient Inference Problems
 
 This module provides the functionalities for linearized Bayesian inference with transient PDE model
 constraints. It comprises a misfit and a pde problem class. These classes extend the hIPPYlib
@@ -9,10 +9,10 @@ fro pde problems linear in the forward, parameter and adjoint variables. However
 can be alleviated relatively easy, at the cost of making the procedure mode computationally expensive.
 The precise code locations for extensions are highlighted accordingly. Moreover, all transient
 solves work on uniform grids with fixed time step size :math: `dt`. Again, the solving routines
-might be easily extended towards more sophisticated algorithms. Lastly, while the forward and 
+might be easily extended towards more sophisticated algorithms. Lastly, while the forward and
 adjoint variables are functions of time in the transient context, we assume that the parameter
 function remains time-independent.
-The theoretical background for the implementation mainly relies on 
+The theoretical background for the implementation mainly relies on
 `this article <https://apps.dtic.mil/sti/citations/ADA555315>`_. Prior knowledge of the methods
 presented therein is necessary to understand the code.
 
@@ -27,7 +27,7 @@ TransientPointwiseStateObservation: Transient misfit functional
 TransientPDEVariationalProblem: Transient pde problem
 """
 
-#====================================== Preliminary Commands =======================================
+# ====================================== Preliminary Commands =======================================
 import warnings
 import numpy as np
 from typing import Callable, Optional, Tuple, Union
@@ -42,9 +42,9 @@ with warnings.catch_warnings():
     import hippylib as hl
 
 
-#===================================== Transient Misfit Class ======================================
+# ===================================== Transient Misfit Class ======================================
 class TransientPointwiseStateObservation(hl.Misfit):
-    """ Transient Misfit Functional
+    """Transient Misfit Functional
 
     This class implements a fully differentiable cost functional for data points in space and time.
     It assumes these points to be discrete, rather then (continuous) functions. Space and time
@@ -69,14 +69,16 @@ class TransientPointwiseStateObservation(hl.Misfit):
                   direction
     """
 
-    #-----------------------------------------------------------------------------------------------
-    def __init__(self,
-                 funcSpace: fe.FunctionSpace,
-                 obsPoints: Union[int, float, np.ndarray],
-                 obsTimes: Union[int, float, np.ndarray],
-                 simTimes: np.ndarray,
-                 data: Optional[Union[hl.TimeDependentVector, np.ndarray]]=None,
-                 noiseVar: Optional[Union[float, np.ndarray]]=None) -> None:
+    # -----------------------------------------------------------------------------------------------
+    def __init__(
+        self,
+        funcSpace: fe.FunctionSpace,
+        obsPoints: Union[int, float, np.ndarray],
+        obsTimes: Union[int, float, np.ndarray],
+        simTimes: np.ndarray,
+        data: Optional[Union[hl.TimeDependentVector, np.ndarray]] = None,
+        noiseVar: Optional[Union[float, np.ndarray]] = None,
+    ) -> None:
         """Constructor
 
         Prepares computations, constructs mapping from data time points to simulation time grid.
@@ -104,16 +106,22 @@ class TransientPointwiseStateObservation(hl.Misfit):
         if not isinstance(simTimes, np.ndarray):
             raise TypeError("Simulation times need to be given as numpy arrays.")
         if not np.all(np.diff(simTimes) > 0):
-            raise ValueError("Simulation time array needs to be given in ascending order.")
+            raise ValueError(
+                "Simulation time array needs to be given in ascending order."
+            )
         if not np.allclose(np.diff(simTimes), np.diff(simTimes)[0]):
             raise ValueError("Simulation time array needs to be evenly spaced.")
-        if not (np.amin(obsTimes) >= np.amin(simTimes)) and (np.amax(obsTimes) <= np.amax(simTimes)):
-            raise ValueError("Bounds of observation times need to lie within simulation times.")
+        if not (np.amin(obsTimes) >= np.amin(simTimes)) and (
+            np.amax(obsTimes) <= np.amax(simTimes)
+        ):
+            raise ValueError(
+                "Bounds of observation times need to lie within simulation times."
+            )
         if not isinstance(funcSpace, fe.FunctionSpace):
             raise TypeError("Function space needs to be proper FEniCS object.")
 
         num_subspaces = funcSpace.num_sub_spaces()
-        self.num_components = (1 if num_subspaces == 0 else num_subspaces)
+        self.num_components = 1 if num_subspaces == 0 else num_subspaces
         self.num_observations = obsPoints.shape[0]
         self._data = None
         self._noiseVar = None
@@ -122,10 +130,12 @@ class TransientPointwiseStateObservation(hl.Misfit):
         self._dt = simTimes[1] - simTimes[0]
         self._simTimeInds = np.indices(simTimes.shape).flatten()
         self._obsTimeInds = np.indices(obsTimes.shape).flatten()
-        
+
         self.C = self._assemble_precision_matrices(noiseVar)
         self._obsMap = self._project_obs_to_sim_grid()
-        self._projMat = hl.pointwiseObservation.assemblePointwiseObservation(funcSpace, obsPoints)
+        self._projMat = hl.pointwiseObservation.assemblePointwiseObservation(
+            funcSpace, obsPoints
+        )
         self._currentFullState = fe.Vector()
         self._currentProjState = fe.Vector()
         self._CBu = fe.Vector()
@@ -136,7 +146,7 @@ class TransientPointwiseStateObservation(hl.Misfit):
         if data is not None:
             self.d = data
 
-    #-----------------------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------
     def cost(self, stateList: list) -> float:
         """Evaluates cost functional for given state
 
@@ -154,24 +164,28 @@ class TransientPointwiseStateObservation(hl.Misfit):
 
         if not (isinstance(stateList, list) and len(stateList) == 3):
             raise TypeError("States have to be given as list with three entries.")
-        if not (isinstance(stateList[hl.STATE], hl.TimeDependentVector)
-           and np.array_equal(stateList[hl.STATE].times, self._simTimes)):
-           raise TypeError("Forward variable needs to be TDV over simulation times.")
+        if not (
+            isinstance(stateList[hl.STATE], hl.TimeDependentVector)
+            and np.array_equal(stateList[hl.STATE].times, self._simTimes)
+        ):
+            raise TypeError("Forward variable needs to be TDV over simulation times.")
 
-        cost = 0 
+        cost = 0
         for i in self._simTimeInds:
             currentFwdVar = stateList[hl.STATE].data[i]
 
             for currentData, C in zip(self.d[i], self._precision[i]):
-                self._projMat.mult(currentFwdVar, self._currentProjState)     
-                self._currentProjState.axpy(-1., currentData)
+                self._projMat.mult(currentFwdVar, self._currentProjState)
+                self._currentProjState.axpy(-1.0, currentData)
                 C.mult(self._currentProjState, self._CBu)
                 cost += 0.5 * self._currentProjState.inner(self._CBu)
 
         return cost
 
-    #-----------------------------------------------------------------------------------------------
-    def grad(self, varInd: int, stateList: list, outVec: hl.TimeDependentVector) -> None:
+    # -----------------------------------------------------------------------------------------------
+    def grad(
+        self, varInd: int, stateList: list, outVec: hl.TimeDependentVector
+    ) -> None:
         """Computes gradient of the cost functional with respect to state or parameter function
 
         Since the cost functional only depends on the forward variable, its variation w.r.t. to the
@@ -203,48 +217,57 @@ class TransientPointwiseStateObservation(hl.Misfit):
         outVec.zero()
 
         if varInd == hl.STATE:
-            if not (isinstance(stateList[hl.STATE], hl.TimeDependentVector)
-               and np.array_equal(stateList[hl.STATE].times, self._simTimes)):
-                raise TypeError("Forward variable needs to be TDV over simulation times.")
-            if not (isinstance(outVec, hl.TimeDependentVector) 
-               and np.array_equal(outVec.times, self._simTimes)):
+            if not (
+                isinstance(stateList[hl.STATE], hl.TimeDependentVector)
+                and np.array_equal(stateList[hl.STATE].times, self._simTimes)
+            ):
+                raise TypeError(
+                    "Forward variable needs to be TDV over simulation times."
+                )
+            if not (
+                isinstance(outVec, hl.TimeDependentVector)
+                and np.array_equal(outVec.times, self._simTimes)
+            ):
                 raise TypeError("Output vector needs to be TDV over simulation times.")
 
             for i in self._simTimeInds:
                 currentFwdVar = stateList[hl.STATE].data[i]
 
                 for currentData, C in zip(self.d[i], self._precision[i]):
-                    self._projMat.mult(currentFwdVar, self._currentProjState)    
-                    self._currentProjState.axpy(-1., currentData)
+                    self._projMat.mult(currentFwdVar, self._currentProjState)
+                    self._currentProjState.axpy(-1.0, currentData)
                     C.mult(self._currentProjState, self._CBu)
                     self._projMat.transpmult(self._CBu, self._currentFullState)
                     outVec.data[i].axpy(1, self._currentFullState)
 
-                outVec.data[i] *= 1./ self._dt
+                outVec.data[i] *= 1.0 / self._dt
         else:
             pass
 
-    #-----------------------------------------------------------------------------------------------
-    def setLinearizationPoint(self, stateList: list, 
-                              gauss_newton_approx: Optional[bool]=False) -> None:
-        """ Sets linearization point for quadratic approximation
+    # -----------------------------------------------------------------------------------------------
+    def setLinearizationPoint(
+        self, stateList: list, gauss_newton_approx: Optional[bool] = False
+    ) -> None:
+        """Sets linearization point for quadratic approximation
 
         This function does nothing, since the cost functional is quadratic in the forward function.
 
         Args:
             stateList (list): Linearization point
-            gauss_newton_approx (Optional[bool], optional): 
+            gauss_newton_approx (Optional[bool], optional):
                 Determines if Gauss-Newton approximation shall be employed. Defaults to False.
         """
 
         pass
 
-    #-----------------------------------------------------------------------------------------------
-    def apply_ij(self, 
-                 iInd: int,
-                 jInd: int,
-                 direction: Union[fe. GenericVector, hl.TimeDependentVector],
-                 outVec: hl.TimeDependentVector) -> None:
+    # -----------------------------------------------------------------------------------------------
+    def apply_ij(
+        self,
+        iInd: int,
+        jInd: int,
+        direction: Union[fe.GenericVector, hl.TimeDependentVector],
+        outVec: hl.TimeDependentVector,
+    ) -> None:
         """Applies second variation with respect to state and/or parameter functions
 
         Since the cost functional only depends on the forward variable, its variation w.r.t. to the
@@ -273,11 +296,17 @@ class TransientPointwiseStateObservation(hl.Misfit):
         outVec.zero()
 
         if iInd == hl.STATE and jInd == hl.STATE:
-            if not (isinstance(direction, hl.TimeDependentVector) 
-               and np.array_equal(direction.times, self._simTimes)):
-                raise TypeError("Forward variable needs to be TDV over simulation times.")
-            if not (isinstance(outVec, hl.TimeDependentVector) 
-               and np.array_equal(outVec.times, self._simTimes)):
+            if not (
+                isinstance(direction, hl.TimeDependentVector)
+                and np.array_equal(direction.times, self._simTimes)
+            ):
+                raise TypeError(
+                    "Forward variable needs to be TDV over simulation times."
+                )
+            if not (
+                isinstance(outVec, hl.TimeDependentVector)
+                and np.array_equal(outVec.times, self._simTimes)
+            ):
                 raise TypeError("Output vector needs to be TDV over simulation times.")
 
             for i in self._simTimeInds:
@@ -291,10 +320,10 @@ class TransientPointwiseStateObservation(hl.Misfit):
         else:
             pass
 
-    #-----------------------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------
     def _project_obs_to_sim_grid(self) -> list[np.ndarray]:
         """Sets up mapping between observation times and simulation time grid
-        
+
         For every simulation time point (except the last), this algorithm associates all observation
         times that lie within the current grid point and the next with that grid point. This mapping
         can later be used to accumulated data on the simulation time grid.
@@ -302,26 +331,29 @@ class TransientPointwiseStateObservation(hl.Misfit):
 
         observationMap = []
         for simInd, t in enumerate(self._simTimes[:-1]):
-            tNext = self._simTimes[simInd+1]
-            obsTimeIndsOnInterval = self._obsTimeInds[(self._obsTimes >= t) 
-                                                    & (self._obsTimes < tNext)]
+            tNext = self._simTimes[simInd + 1]
+            obsTimeIndsOnInterval = self._obsTimeInds[
+                (self._obsTimes >= t) & (self._obsTimes < tNext)
+            ]
             observationMap.append(obsTimeIndsOnInterval)
         upperBoundPoints = self._obsTimeInds[(self._obsTimes == self._simTimes[-1])]
         observationMap.append(upperBoundPoints)
 
         return observationMap
 
-    #-----------------------------------------------------------------------------------------------
-    def _assign_obs_to_sim_intervals(self, obsVec: hl.timeDependentVector) \
-        -> list[list[fe.GenericVector]]:
+    # -----------------------------------------------------------------------------------------------
+    def _assign_obs_to_sim_intervals(
+        self, obsVec: hl.timeDependentVector
+    ) -> list[list[fe.GenericVector]]:
         """Assigns data to simulation time grid
-        
+
         Using the previously assembled mapping, this routine assigns data from arbitrary observation
         times to their associated points on the simulation time grid.
         """
 
-        assert np.array_equal(obsVec.times, self._obsTimes), \
+        assert np.array_equal(obsVec.times, self._obsTimes), (
             "Time points of the given vector need to match observation times."
+        )
 
         effDataVec = []
         effNoiseVar = []
@@ -337,12 +369,14 @@ class TransientPointwiseStateObservation(hl.Misfit):
             effNoiseVar.append(currentVars)
 
         return effDataVec, effNoiseVar
-    
-    #-----------------------------------------------------------------------------------------------
-    def _assemble_precision_matrices(self, noiseVar: Union[np.ndarray]) -> list[dl.PETScMatrix]:
+
+    # -----------------------------------------------------------------------------------------------
+    def _assemble_precision_matrices(
+        self, noiseVar: Union[np.ndarray]
+    ) -> list[dl.PETScMatrix]:
         precision_matrix_list = []
         num_time_steps = self._obsTimeInds.shape[0]
-        
+
         for i in range(num_time_steps):
             if isinstance(noiseVar, float):
                 current_noise = noiseVar
@@ -352,7 +386,7 @@ class TransientPointwiseStateObservation(hl.Misfit):
             precision_matrix_list.append(precision_matrix)
         return precision_matrix_list
 
-    #-----------------------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------
     @property
     def d(self) -> list[list[fe.GenericVector]]:
         if self._data is None:
@@ -365,7 +399,7 @@ class TransientPointwiseStateObservation(hl.Misfit):
             raise ValueError("Property has not been initialized.")
         return self._noiseVar
 
-    #-----------------------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------
     @d.setter
     def d(self, data: Union[hl.TimeDependentVector, np.ndarray]) -> None:
         if isinstance(data, np.ndarray):
@@ -379,16 +413,16 @@ class TransientPointwiseStateObservation(hl.Misfit):
         if not isinstance(noiseVar, float) and noiseVar > 0:
             raise TypeError("Noise variance needs to be given as positive number.")
         self._noiseVar = noiseVar
-    
 
-#============================ Transient PDE Variational Problem Class ==============================
+
+# ============================ Transient PDE Variational Problem Class ==============================
 class TransientPDEVariationalProblem(hl.PDEProblem):
     """Transient PDE problem
 
     This class implements transient PDE problems governing the Bayesian inference problem. It
     provides all differentiation capabilities for second order optimization algorithms. The
     implementation assumes a PDE of the form :math: `\frac{\partial u}{\partial t} + f(u,m) = 0`.
-    As mentioned in the module header, the spacial operator :math:`f` is further assumed to be 
+    As mentioned in the module header, the spacial operator :math:`f` is further assumed to be
     linear in :math: `u` and :math: `m`. All implemented routines compute portions of the Lagrangian
     governing the optimization problem of linearized inference.
     The implementation relies on low-level routines from the FEM sub-package for transient solves.
@@ -405,17 +439,19 @@ class TransientPDEVariationalProblem(hl.PDEProblem):
         setLinearizationPoint: Sets point for linearized evaluation of second variations
         solveIncremental: Solves the incremental forward and adjoint problems resulting from a
                           Newton solver step
-        apply_ij: Applies second variations necessary for the rhs construction in Newton solves   
+        apply_ij: Applies second variations necessary for the rhs construction in Newton solves
     """
 
-    #-----------------------------------------------------------------------------------------------
-    def __init__(self,
-                 funcSpaces: list[fe.FunctionSpace], 
-                 weakFormHandle: Callable,
-                 boundConds: list[fe.DirichletBC], 
-                 boundCondsHomogeneous: list[fe.DirichletBC],
-                 initFunc: Union[Callable, fe.GenericVector],
-                 simTimes: np.ndarray) -> None:
+    # -----------------------------------------------------------------------------------------------
+    def __init__(
+        self,
+        funcSpaces: list[fe.FunctionSpace],
+        weakFormHandle: Callable,
+        boundConds: list[fe.DirichletBC],
+        boundCondsHomogeneous: list[fe.DirichletBC],
+        initFunc: Union[Callable, fe.GenericVector],
+        simTimes: np.ndarray,
+    ) -> None:
         """Constructor
 
         Reads input and sets up supplementary data structures.
@@ -437,15 +473,24 @@ class TransientPDEVariationalProblem(hl.PDEProblem):
             ValueError: Checks that simulation times are evenly spaced
         """
 
-        if not (isinstance(funcSpaces, list) and len(funcSpaces) == 3 
-           and all(isinstance(space, fe.FunctionSpace) for space in funcSpaces)):
-            raise TypeError("Functions spaces need to be provided in list of three entries.")
+        if not (
+            isinstance(funcSpaces, list)
+            and len(funcSpaces) == 3
+            and all(isinstance(space, fe.FunctionSpace) for space in funcSpaces)
+        ):
+            raise TypeError(
+                "Functions spaces need to be provided in list of three entries."
+            )
         if not callable(weakFormHandle):
             raise TypeError("Weak form handle needs to be callable Object.")
-        if not all(isinstance(bcList, list) for bcList in [boundConds, boundCondsHomogeneous]):
+        if not all(
+            isinstance(bcList, list) for bcList in [boundConds, boundCondsHomogeneous]
+        ):
             raise TypeError("Boundary conditions have to be given in list format.")
-        if not all((isinstance(bc, fe.DirichletBC) for bc in bcList) 
-                   for bcList in [boundConds, boundCondsHomogeneous]):
+        if not all(
+            (isinstance(bc, fe.DirichletBC) for bc in bcList)
+            for bcList in [boundConds, boundCondsHomogeneous]
+        ):
             raise TypeError("All boundary conditions mus be FEniCS DirichletBC.")
         if not isinstance(simTimes, np.ndarray):
             raise TypeError("Simulation times need to be given as numpy array.")
@@ -470,8 +515,10 @@ class TransientPDEVariationalProblem(hl.PDEProblem):
         self._dt = simTimes[1] - simTimes[0]
 
         self._massMatrix = self._construct_mass_matrix()
-        self._initSol, self._initSolHomogeneous = self._construct_initial_solution(initFunc)
-        
+        self._initSol, self._initSolHomogeneous = self._construct_initial_solution(
+            initFunc
+        )
+
         self._dummyFuncFwd = fe.Function(self._funcSpaces[hl.STATE])
         self._dummyFuncAdj = fe.Function(self._funcSpaces[hl.ADJOINT])
         self._dummyTrialFwd = fe.TrialFunction(self._funcSpaces[hl.STATE])
@@ -481,7 +528,7 @@ class TransientPDEVariationalProblem(hl.PDEProblem):
         self._dummyTestAdj = fe.TestFunction(self._funcSpaces[hl.ADJOINT])
         self._dummyTestParam = fe.TestFunction(self._funcSpaces[hl.PARAMETER])
 
-    #-----------------------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------
     def generate_state(self) -> hl.TimeDependentVector:
         """Generates forward function vector
 
@@ -493,7 +540,7 @@ class TransientPDEVariationalProblem(hl.PDEProblem):
         stateVec.initialize(self._massMatrix, 1)
         return stateVec
 
-    #-----------------------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------
     def generate_parameter(self) -> fe.GenericVector:
         """Generates parameter function vector
 
@@ -504,8 +551,8 @@ class TransientPDEVariationalProblem(hl.PDEProblem):
         paramFunc = fe.Function(self._funcSpaces[hl.PARAMETER])
         paramVec = paramFunc.vector()
         return paramVec
-    
-    #-----------------------------------------------------------------------------------------------
+
+    # -----------------------------------------------------------------------------------------------
     def generate_parameter_timeseries(self) -> hl.TimeDependentVector:
         """Generates series of parameter functions over simulation times
 
@@ -518,7 +565,7 @@ class TransientPDEVariationalProblem(hl.PDEProblem):
             self.init_parameter(d)
         return paramSeriesVec
 
-    #-----------------------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------
     def init_parameter(self, paramVec: fe.GenericVector) -> None:
         """Initialize parameter vector to have correct size
 
@@ -534,7 +581,7 @@ class TransientPDEVariationalProblem(hl.PDEProblem):
         dummyVec = self.generate_parameter()
         paramVec.init(dummyVec.local_size())
 
-    #-----------------------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------
     def solveFwd(self, forwardSol: hl.TimeDependentVector, stateList: list) -> None:
         """Solves the transient forward problem
 
@@ -550,34 +597,42 @@ class TransientPDEVariationalProblem(hl.PDEProblem):
             TypeError: Checks type of result vector
         """
 
-        if not (isinstance(forwardSol, hl.TimeDependentVector)
-           and np.array_equal(forwardSol.times, self._simTimes)):
-            raise TypeError("Solution vector needs to be TDV over simulation times.") 
-        
+        if not (
+            isinstance(forwardSol, hl.TimeDependentVector)
+            and np.array_equal(forwardSol.times, self._simTimes)
+        ):
+            raise TypeError("Solution vector needs to be TDV over simulation times.")
+
         forwardSol.zero()
-        lhsMatrix, rhsVector =  self._assemble_forward(stateList)
+        lhsMatrix, rhsVector = self._assemble_forward(stateList)
         solver = fe.LUSolver(lhsMatrix)
 
-        solveSettings = {"init_sol": self._initSol,
-                         "time_step_size": self._dt,
-                         "mass_matrix": self._massMatrix,
-                         "rhs": rhsVector,
-                         "bcs": self._boundConds}
+        solveSettings = {
+            "init_sol": self._initSol,
+            "time_step_size": self._dt,
+            "mass_matrix": self._massMatrix,
+            "rhs": rhsVector,
+            "bcs": self._boundConds,
+        }
 
-        femFunctions.solve_transient(self._simTimeInds, solver, solveSettings, forwardSol)
+        femFunctions.solve_transient(
+            self._simTimeInds, solver, solveSettings, forwardSol
+        )
 
-    #-----------------------------------------------------------------------------------------------
-    def solveAdj(self, 
-                 adjointSol: hl.TimeDependentVector, 
-                 stateList: list,
-                 adjointRhs: hl.TimeDependentVector) -> None:
+    # -----------------------------------------------------------------------------------------------
+    def solveAdj(
+        self,
+        adjointSol: hl.TimeDependentVector,
+        stateList: list,
+        adjointRhs: hl.TimeDependentVector,
+    ) -> None:
         """Solves the transient adjoint problem
 
         The adjoint problem results from the first variation of the Lagrangian w.r.t. to the forward
         variable. It is a final value problem with homogeneous final value and boundary conditions.
         Accordingly, the it needs to be solved backwards in time. For given parameter and forward
         function, the adjoint problem yields the adjoint variable, which corresponds to the Lagrange
-        multiplier of the PDE constraint in the optimization setting. 
+        multiplier of the PDE constraint in the optimization setting.
 
         Args:
             adjointSol (hl.TimeDependentVector): Result vector
@@ -589,26 +644,34 @@ class TransientPDEVariationalProblem(hl.PDEProblem):
             TypeError: Checks type of rhs vector
         """
 
-        if not (isinstance(adjointSol, hl.TimeDependentVector)
-           and np.array_equal(adjointSol.times, self._simTimes)):
+        if not (
+            isinstance(adjointSol, hl.TimeDependentVector)
+            and np.array_equal(adjointSol.times, self._simTimes)
+        ):
             raise TypeError("Solution vector needs to be TDV over simulation times.")
-        if not (isinstance(adjointRhs, hl.TimeDependentVector)
-           and np.array_equal(adjointRhs.times, self._simTimes)):
+        if not (
+            isinstance(adjointRhs, hl.TimeDependentVector)
+            and np.array_equal(adjointRhs.times, self._simTimes)
+        ):
             raise TypeError("RHS vector needs to be TDV over simulation times.")
 
         adjointSol.zero()
         lhsMatrix = self._assemble_adjoint(stateList)
         solver = fe.LUSolver(lhsMatrix)
-        
-        solveSettings = {"init_sol": self._initSolHomogeneous,
-                         "time_step_size": self._dt,
-                         "mass_matrix": self._massMatrix,
-                         "rhs": adjointRhs,
-                         "bcs": self._boundCondsHomogeneous}
 
-        femFunctions.solve_transient(self._revSimTimeInds, solver, solveSettings, adjointSol)
+        solveSettings = {
+            "init_sol": self._initSolHomogeneous,
+            "time_step_size": self._dt,
+            "mass_matrix": self._massMatrix,
+            "rhs": adjointRhs,
+            "bcs": self._boundCondsHomogeneous,
+        }
 
-    #-----------------------------------------------------------------------------------------------
+        femFunctions.solve_transient(
+            self._revSimTimeInds, solver, solveSettings, adjointSol
+        )
+
+    # -----------------------------------------------------------------------------------------------
     def evalGradientParameter(self, stateList: list, grad: fe.GenericVector) -> None:
         """Evaluates gradient of the pde-related portion of the Lagrangian w.r.t. parameter function
 
@@ -628,15 +691,19 @@ class TransientPDEVariationalProblem(hl.PDEProblem):
 
         if not (isinstance(stateList, list) and len(stateList) == 3):
             raise TypeError("States have to be given as list with three entries.")
-        if not (isinstance(stateList[hl.STATE], hl.TimeDependentVector)
-           and np.array_equal(stateList[hl.STATE].times, self._simTimes)):
-           raise TypeError("Forward variable needs to be TDV over simulation times.")
-        if not (isinstance(stateList[hl.ADJOINT], hl.TimeDependentVector)
-           and np.array_equal(stateList[hl.STATE].times, self._simTimes)):
-           raise TypeError("Adjoint variable needs to be TDV over simulation times.")
+        if not (
+            isinstance(stateList[hl.STATE], hl.TimeDependentVector)
+            and np.array_equal(stateList[hl.STATE].times, self._simTimes)
+        ):
+            raise TypeError("Forward variable needs to be TDV over simulation times.")
+        if not (
+            isinstance(stateList[hl.ADJOINT], hl.TimeDependentVector)
+            and np.array_equal(stateList[hl.STATE].times, self._simTimes)
+        ):
+            raise TypeError("Adjoint variable needs to be TDV over simulation times.")
         if not isinstance(grad, fe.GenericVector):
             raise TypeError("Parameter variable needs to be FEniCS vector.")
-        
+
         forwardVec = stateList[hl.STATE]
         adjointVec = stateList[hl.ADJOINT]
         paramVec = stateList[hl.PARAMETER]
@@ -644,24 +711,30 @@ class TransientPDEVariationalProblem(hl.PDEProblem):
         gradTimeSeries = self.generate_parameter_timeseries()
 
         for i in self._simTimeInds:
-            forwardFunc = hl.vector2Function(forwardVec.data[i], self._funcSpaces[hl.STATE])
-            adjointFunc = hl.vector2Function(adjointVec.data[i], self._funcSpaces[hl.ADJOINT])
+            forwardFunc = hl.vector2Function(
+                forwardVec.data[i], self._funcSpaces[hl.STATE]
+            )
+            adjointFunc = hl.vector2Function(
+                adjointVec.data[i], self._funcSpaces[hl.ADJOINT]
+            )
             weakForm = self._weakFormHandle(forwardFunc, paramFunc, adjointFunc)
-            gradVec = fe.assemble(fe.derivative(weakForm, paramFunc, self._dummyTestParam))
+            gradVec = fe.assemble(
+                fe.derivative(weakForm, paramFunc, self._dummyTestParam)
+            )
             gradTimeSeries.data[i] = gradVec
 
         self._integrate_time_trapezoidal(gradTimeSeries, grad)
 
-    #-----------------------------------------------------------------------------------------------
-    def setLinearizationPoint(self, 
-                              stateList: list, 
-                              gaussNewtonApprox: Optional[bool]=False) -> None:
+    # -----------------------------------------------------------------------------------------------
+    def setLinearizationPoint(
+        self, stateList: list, gaussNewtonApprox: Optional[bool] = False
+    ) -> None:
         """Sets linearization point for evaluation of second variations (Newton step)
 
         This routines sets up the necessary structure for a Newton step about a given linearization
         point. In particular, it constructs the solver structures to compute the step increments for
         the forward and adjoint variables. Other structures could be pre-assembled as well, but they
-        are instead computed on-the-fly in the respective sub-routines. This approach favors a 
+        are instead computed on-the-fly in the respective sub-routines. This approach favors a
         smaller memory footprint over performance.
 
         Args:
@@ -677,46 +750,69 @@ class TransientPDEVariationalProblem(hl.PDEProblem):
         if not (isinstance(stateList, list) and len(stateList) == 3):
             raise TypeError("States have to be given as list with three entries.")
         if not isinstance(gaussNewtonApprox, bool):
-            raise TypeError("Gauss Newton approximation needs to be given as boolean parameter.")
+            raise TypeError(
+                "Gauss Newton approximation needs to be given as boolean parameter."
+            )
 
         self._gaussNewtonApprox = gaussNewtonApprox
         self._linPointFwd = []
         self._linPointAdj = []
         for i in self._simTimeInds:
-            self._linPointFwd.append(hl.vector2Function(stateList[hl.STATE].data[i], 
-                                                        self._funcSpaces[hl.STATE]))
-            self._linPointAdj.append(hl.vector2Function(stateList[hl.ADJOINT].data[i], 
-                                                        self._funcSpaces[hl.ADJOINT]))
-        self._linPointParam = hl.vector2Function(stateList[hl.PARAMETER], 
-                                                 self._funcSpaces[hl.PARAMETER])
+            self._linPointFwd.append(
+                hl.vector2Function(
+                    stateList[hl.STATE].data[i], self._funcSpaces[hl.STATE]
+                )
+            )
+            self._linPointAdj.append(
+                hl.vector2Function(
+                    stateList[hl.ADJOINT].data[i], self._funcSpaces[hl.ADJOINT]
+                )
+            )
+        self._linPointParam = hl.vector2Function(
+            stateList[hl.PARAMETER], self._funcSpaces[hl.PARAMETER]
+        )
 
-        weakForm = self._weakFormHandle(self._dummyFuncFwd, self._linPointParam, self._dummyFuncAdj)
-        hessAdjFwdForm = fe.derivative(fe.derivative(weakForm, self._dummyFuncAdj, self._dummyTestAdj),
-                                       self._dummyFuncFwd, self._dummyTrialFwd)
-        hessFwdAdjForm = fe.derivative(fe.derivative(weakForm, self._dummyFuncFwd, self._dummyTestFwd),
-                                       self._dummyFuncAdj, self._dummyTrialAdj)
-        
-        solverMatFwdIncr, _ = femFunctions.assemble_transient(self._funcSpaces[hl.STATE],
-                                                              self._dt,
-                                                              hessAdjFwdForm,
-                                                              self._boundCondsHomogeneous)
-        solverMatAdjIncr, _ = femFunctions.assemble_transient(self._funcSpaces[hl.ADJOINT],
-                                                              self._dt,
-                                                              hessFwdAdjForm,
-                                                              self._boundCondsHomogeneous)
+        weakForm = self._weakFormHandle(
+            self._dummyFuncFwd, self._linPointParam, self._dummyFuncAdj
+        )
+        hessAdjFwdForm = fe.derivative(
+            fe.derivative(weakForm, self._dummyFuncAdj, self._dummyTestAdj),
+            self._dummyFuncFwd,
+            self._dummyTrialFwd,
+        )
+        hessFwdAdjForm = fe.derivative(
+            fe.derivative(weakForm, self._dummyFuncFwd, self._dummyTestFwd),
+            self._dummyFuncAdj,
+            self._dummyTrialAdj,
+        )
+
+        solverMatFwdIncr, _ = femFunctions.assemble_transient(
+            self._funcSpaces[hl.STATE],
+            self._dt,
+            hessAdjFwdForm,
+            self._boundCondsHomogeneous,
+        )
+        solverMatAdjIncr, _ = femFunctions.assemble_transient(
+            self._funcSpaces[hl.ADJOINT],
+            self._dt,
+            hessFwdAdjForm,
+            self._boundCondsHomogeneous,
+        )
 
         self._solverIncrFwd = fe.LUSolver(solverMatFwdIncr)
         self._solverIncrAdj = fe.LUSolver(solverMatAdjIncr)
-      
-    #-----------------------------------------------------------------------------------------------
-    def solveIncremental(self,
-                         solVec: hl.TimeDependentVector,
-                         rhsVec: hl.TimeDependentVector,
-                         isAdj: bool) -> None:
+
+    # -----------------------------------------------------------------------------------------------
+    def solveIncremental(
+        self,
+        solVec: hl.TimeDependentVector,
+        rhsVec: hl.TimeDependentVector,
+        isAdj: bool,
+    ) -> None:
         """Solve incremental forward and adjoint problems for Newton step
 
         The incremental forward problem is an initial value problem, which is solved forward in time.
-        In contrast, the incremental adjoint problem is a final value problem, which needs to be 
+        In contrast, the incremental adjoint problem is a final value problem, which needs to be
         solved backwards in time. Both problems obey homogeneous initial/final value and boundary
         conditions, since they solve for increments only.
 
@@ -731,37 +827,43 @@ class TransientPDEVariationalProblem(hl.PDEProblem):
             TypeError: Checks type of isAdj parameter
         """
 
-        if not (isinstance(solVec, hl.TimeDependentVector)
-           and np.array_equal(solVec.times, self._simTimes)):
+        if not (
+            isinstance(solVec, hl.TimeDependentVector)
+            and np.array_equal(solVec.times, self._simTimes)
+        ):
             raise TypeError("Solution vector needs to be TDV over simulation times.")
-        if not (isinstance(rhsVec, hl.TimeDependentVector)
-           and np.array_equal(rhsVec.times, self._simTimes)):
+        if not (
+            isinstance(rhsVec, hl.TimeDependentVector)
+            and np.array_equal(rhsVec.times, self._simTimes)
+        ):
             raise TypeError("RHS vector needs to be TDV over simulation times.")
         if not isinstance(isAdj, bool):
             raise TypeError("isAdj needs to be boolean parameter.")
-        
-        solveSettings = {"init_sol": self._initSolHomogeneous,
-                         "time_step_size": self._dt,
-                         "mass_matrix": self._massMatrix,
-                         "rhs": rhsVec,
-                         "bcs": self._boundCondsHomogeneous}
-        if isAdj:
-            femFunctions.solve_transient(self._revSimTimeInds,
-                                         self._solverIncrAdj,
-                                         solveSettings,
-                                         solVec)
-        else:
-            femFunctions.solve_transient(self._simTimeInds,
-                                         self._solverIncrFwd,
-                                         solveSettings,
-                                         solVec)
 
-    #-----------------------------------------------------------------------------------------------
-    def apply_ij(self, 
-                 iInd: int,
-                 jInd: int,
-                 direction: Union[fe.GenericVector, hl.TimeDependentVector],
-                 outVec: Union[fe.GenericVector, hl.TimeDependentVector]) -> None:
+        solveSettings = {
+            "init_sol": self._initSolHomogeneous,
+            "time_step_size": self._dt,
+            "mass_matrix": self._massMatrix,
+            "rhs": rhsVec,
+            "bcs": self._boundCondsHomogeneous,
+        }
+        if isAdj:
+            femFunctions.solve_transient(
+                self._revSimTimeInds, self._solverIncrAdj, solveSettings, solVec
+            )
+        else:
+            femFunctions.solve_transient(
+                self._simTimeInds, self._solverIncrFwd, solveSettings, solVec
+            )
+
+    # -----------------------------------------------------------------------------------------------
+    def apply_ij(
+        self,
+        iInd: int,
+        jInd: int,
+        direction: Union[fe.GenericVector, hl.TimeDependentVector],
+        outVec: Union[fe.GenericVector, hl.TimeDependentVector],
+    ) -> None:
         """Apply second variations of the pde-related Lagrangian part
 
         This routines applies the second variation of the Lagrangian in a given direction. It is
@@ -779,9 +881,11 @@ class TransientPDEVariationalProblem(hl.PDEProblem):
         Raises:
             ValueError: Checks for valid index combinations
         """
-        
-        if (self._gaussNewtonApprox and [iInd, jInd] in [[hl.PARAMETER, hl.STATE],
-                                                         [hl.STATE, hl.PARAMETER]]):
+
+        if self._gaussNewtonApprox and [iInd, jInd] in [
+            [hl.PARAMETER, hl.STATE],
+            [hl.STATE, hl.PARAMETER],
+        ]:
             outVec.zero()
         elif [iInd, jInd] == [hl.STATE, hl.STATE]:
             self._apply_hess_state_state(direction, outVec)
@@ -790,16 +894,18 @@ class TransientPDEVariationalProblem(hl.PDEProblem):
         elif [iInd, jInd] == [hl.PARAMETER, hl.STATE]:
             self._apply_hess_param_other(direction, outVec, isForward=True)
         elif [iInd, jInd] == [hl.PARAMETER, hl.ADJOINT]:
-            self._apply_hess_param_other(direction, outVec, isForward=False)  
+            self._apply_hess_param_other(direction, outVec, isForward=False)
         elif [iInd, jInd] == [hl.STATE, hl.PARAMETER]:
             self._apply_hess_other_param(direction, outVec, isForward=True)
         elif [iInd, jInd] == [hl.ADJOINT, hl.PARAMETER]:
             self._apply_hess_other_param(direction, outVec, isForward=False)
         else:
-            raise ValueError(f"Function not supported for the "
-                              "combination of indices '{iInd}, {jInd}'")  
+            raise ValueError(
+                f"Function not supported for the "
+                "combination of indices '{iInd}, {jInd}'"
+            )
 
-    #-----------------------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------
     def _construct_mass_matrix(self):
         """Constructs FEM mass matrix"""
 
@@ -807,42 +913,48 @@ class TransientPDEVariationalProblem(hl.PDEProblem):
         adjointVar = fe.TestFunction(self._funcSpaces[hl.ADJOINT])
         massMatrixFunctional = forwardVar * adjointVar * fe.dx
         massMatrix = fe.assemble(massMatrixFunctional)
-        assert isinstance(massMatrix, fe.Matrix), \
-            "Object is not a valid FEniCS matrix."
+        assert isinstance(massMatrix, fe.Matrix), "Object is not a valid FEniCS matrix."
 
         return massMatrix
 
-    #-----------------------------------------------------------------------------------------------
-    def _construct_initial_solution(self, initFunc: Union[fe.GenericVector, Callable]) \
-        -> Tuple[fe.GenericVector]:
+    # -----------------------------------------------------------------------------------------------
+    def _construct_initial_solution(
+        self, initFunc: Union[fe.GenericVector, Callable]
+    ) -> Tuple[fe.GenericVector]:
         """Sets original and homogeneous initial conditions"""
 
-        if isinstance (initFunc, fe.GenericVector):
+        if isinstance(initFunc, fe.GenericVector):
             initSolFwd = initFunc
         elif callable(initFunc):
             initSolFwd = utils.pyfunc_to_fevec(initFunc, self._funcSpaces[hl.STATE])
         else:
-            raise TypeError("Initial condition needs to be FEniCS vector or callable object.")  
+            raise TypeError(
+                "Initial condition needs to be FEniCS vector or callable object."
+            )
 
         initSolAdj = fe.Function(self._funcSpaces[hl.ADJOINT])
         initSolAdj = initSolAdj.vector()
 
         return initSolFwd, initSolAdj
 
-    #-----------------------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------
     def _assemble_forward(self, stateList: list) -> Tuple[fe.Matrix, fe.GenericVector]:
         """Assembles matrix & vector for forward transient solve"""
 
-        assert (isinstance(stateList, list) and len(stateList) == 3), \
+        assert isinstance(stateList, list) and len(stateList) == 3, (
             "States have to be given as list with three entries."
-        
-        paramVar = hl.vector2Function(stateList[hl.PARAMETER], self._funcSpaces[hl.PARAMETER])
-        weakForm = self._weakFormHandle(self._dummyTrialFwd, paramVar, self._dummyTestAdj)
-        lhsMatrix, rhsConst = femFunctions.assemble_transient(self._funcSpaces[hl.STATE],
-                                                              self._dt,
-                                                              weakForm,
-                                                              self._boundConds)
-        
+        )
+
+        paramVar = hl.vector2Function(
+            stateList[hl.PARAMETER], self._funcSpaces[hl.PARAMETER]
+        )
+        weakForm = self._weakFormHandle(
+            self._dummyTrialFwd, paramVar, self._dummyTestAdj
+        )
+        lhsMatrix, rhsConst = femFunctions.assemble_transient(
+            self._funcSpaces[hl.STATE], self._dt, weakForm, self._boundConds
+        )
+
         rhsVector = hl.TimeDependentVector(self._simTimes)
         rhsVector.initialize(self._massMatrix, 0)
         for i in self._simTimeInds:
@@ -850,90 +962,103 @@ class TransientPDEVariationalProblem(hl.PDEProblem):
 
         return lhsMatrix, rhsVector
 
-    #-----------------------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------
     def _assemble_adjoint(self, stateList: list) -> fe.Matrix:
         """Assembles matrix & vector for adjoint transient solve"""
 
-        assert (isinstance(stateList, list) and len(stateList) == 3), \
+        assert isinstance(stateList, list) and len(stateList) == 3, (
             "States have to be given as list with three entries."
-             
-        paramFunc = hl.vector2Function(stateList[hl.PARAMETER], self._funcSpaces[hl.PARAMETER])
-        weakForm = self._weakFormHandle(self._dummyFuncFwd, paramFunc, self._dummyTrialAdj)
+        )
+
+        paramFunc = hl.vector2Function(
+            stateList[hl.PARAMETER], self._funcSpaces[hl.PARAMETER]
+        )
+        weakForm = self._weakFormHandle(
+            self._dummyFuncFwd, paramFunc, self._dummyTrialAdj
+        )
         adjointForm = fe.derivative(weakForm, self._dummyFuncFwd, self._dummyTestFwd)
 
-        lhsMatrix, _ = femFunctions.assemble_transient(self._funcSpaces[hl.STATE],
-                                                       self._dt,
-                                                       adjointForm,
-                                                       self._boundCondsHomogeneous)
+        lhsMatrix, _ = femFunctions.assemble_transient(
+            self._funcSpaces[hl.STATE],
+            self._dt,
+            adjointForm,
+            self._boundCondsHomogeneous,
+        )
 
         return lhsMatrix
 
-    #-----------------------------------------------------------------------------------------------
-    def _integrate_time_trapezoidal(self, 
-                                    tdVec: hl.TimeDependentVector, 
-                                    resultVec: fe.GenericVector) -> None:
+    # -----------------------------------------------------------------------------------------------
+    def _integrate_time_trapezoidal(
+        self, tdVec: hl.TimeDependentVector, resultVec: fe.GenericVector
+    ) -> None:
         """Integration of vectors over time with trapezoidal method"""
 
-        assert (isinstance(tdVec, hl.TimeDependentVector)
-           and np.array_equal(tdVec.times, self._simTimes)), \
-            "Input vector needs to be TDV over simulation times."
-        assert isinstance(resultVec, fe.GenericVector), \
+        assert isinstance(tdVec, hl.TimeDependentVector) and np.array_equal(
+            tdVec.times, self._simTimes
+        ), "Input vector needs to be TDV over simulation times."
+        assert isinstance(resultVec, fe.GenericVector), (
             "Result vector needs to be FEniCS vector."
+        )
 
         resultVec.zero()
-        resultVec.axpy(0.5*self._dt, tdVec.data[0])
-        resultVec.axpy(0.5*self._dt, tdVec.data[-1])
+        resultVec.axpy(0.5 * self._dt, tdVec.data[0])
+        resultVec.axpy(0.5 * self._dt, tdVec.data[-1])
         for i in self._simTimeInds[1:-1]:
             resultVec.axpy(self._dt, tdVec.data[i])
 
-    #-----------------------------------------------------------------------------------------------
-    def _apply_hess_state_state(self, 
-                                direction: hl.TimeDependentVector, 
-                                outVec: hl.TimeDependentVector) -> None:
+    # -----------------------------------------------------------------------------------------------
+    def _apply_hess_state_state(
+        self, direction: hl.TimeDependentVector, outVec: hl.TimeDependentVector
+    ) -> None:
         """Apply second variation with respect to forward & forward functions
-        
+
         Under the assumption that the pde problem is linear in the forward variable, this is zero.
         """
 
-        assert (isinstance(direction, hl.TimeDependentVector) 
-           and np.array_equal(direction.times, self._simTimes)), \
-           "Direction variable needs to be TDV over simulation times."
-        assert (isinstance(outVec, hl.TimeDependentVector) 
-           and np.array_equal(outVec.times, self._simTimes)), \
-           "Output vector needs to be TDV over simulation times."
+        assert isinstance(direction, hl.TimeDependentVector) and np.array_equal(
+            direction.times, self._simTimes
+        ), "Direction variable needs to be TDV over simulation times."
+        assert isinstance(outVec, hl.TimeDependentVector) and np.array_equal(
+            outVec.times, self._simTimes
+        ), "Output vector needs to be TDV over simulation times."
         outVec.zero()
 
-    #-----------------------------------------------------------------------------------------------
-    def _apply_hess_param_param(self, 
-                                direction: fe.GenericVector, 
-                                outVec: fe.GenericVector) -> None:
+    # -----------------------------------------------------------------------------------------------
+    def _apply_hess_param_param(
+        self, direction: fe.GenericVector, outVec: fe.GenericVector
+    ) -> None:
         """Apply second variation with respect to parameter & parameter functions
-        
+
         Under the assumption that the pde problem is linear in the parameter variable, this is zero.
         """
 
-        assert isinstance(direction, fe.GenericVector), \
-           "Direction needs to be FEniCS vector."
-        assert isinstance(outVec, fe.GenericVector), \
-           "Output vector needs to be FEniCS vector."
+        assert isinstance(direction, fe.GenericVector), (
+            "Direction needs to be FEniCS vector."
+        )
+        assert isinstance(outVec, fe.GenericVector), (
+            "Output vector needs to be FEniCS vector."
+        )
         outVec.zero()
 
-    #-----------------------------------------------------------------------------------------------
-    def _apply_hess_param_other(self, 
-                                direction: hl.TimeDependentVector, 
-                                outVec: fe.GenericVector,
-                                isForward: bool) -> None:
+    # -----------------------------------------------------------------------------------------------
+    def _apply_hess_param_other(
+        self,
+        direction: hl.TimeDependentVector,
+        outVec: fe.GenericVector,
+        isForward: bool,
+    ) -> None:
         """Apply second variation with respect to parameter & forward/adjoint functions
-        
+
         The application direction is a time-dependent vector. The result is a time-independent
         vector, which is obtained through integration over time.
         """
 
-        assert (isinstance(direction, hl.TimeDependentVector) 
-           and np.array_equal(direction.times, self._simTimes)), \
-           "Direction variable needs to be TDV over simulation times."
-        assert isinstance(outVec, fe.GenericVector), \
-           "Output vector needs to be FEniCS vector."
+        assert isinstance(direction, hl.TimeDependentVector) and np.array_equal(
+            direction.times, self._simTimes
+        ), "Direction variable needs to be TDV over simulation times."
+        assert isinstance(outVec, fe.GenericVector), (
+            "Output vector needs to be FEniCS vector."
+        )
         outVec.zero()
 
         if isForward:
@@ -944,38 +1069,46 @@ class TransientPDEVariationalProblem(hl.PDEProblem):
             trialDir = self._dummyTrialAdj
 
         resultTimeSeries = self.generate_parameter_timeseries()
-        
+
         for i in self._simTimeInds:
             forwardFunc = self._linPointFwd[i]
             adjointFunc = self._linPointAdj[i]
-            weakForm = self._weakFormHandle(forwardFunc, self._linPointParam, adjointFunc)
+            weakForm = self._weakFormHandle(
+                forwardFunc, self._linPointParam, adjointFunc
+            )
             derivativeFuncs = [forwardFunc, adjointFunc]
 
-            hessForm = fe.derivative(fe.derivative(weakForm, self._linPointParam, self._dummyTestParam),
-                                     derivativeFuncs[derivativeInd], trialDir)
+            hessForm = fe.derivative(
+                fe.derivative(weakForm, self._linPointParam, self._dummyTestParam),
+                derivativeFuncs[derivativeInd],
+                trialDir,
+            )
             hessMat = fe.assemble(hessForm)
             hessMat.mult(direction.data[i], resultTimeSeries.data[i])
-            
+
         self._integrate_time_trapezoidal(resultTimeSeries, outVec)
 
-    #-----------------------------------------------------------------------------------------------
-    def _apply_hess_other_param(self, 
-                                direction: fe.GenericVector, 
-                                outVec: hl.TimeDependentVector,
-                                isForward: bool) -> None:
+    # -----------------------------------------------------------------------------------------------
+    def _apply_hess_other_param(
+        self,
+        direction: fe.GenericVector,
+        outVec: hl.TimeDependentVector,
+        isForward: bool,
+    ) -> None:
         """Apply second variation with respect to forward/adjoint & parameter functions
-        
+
         The application direction is time-independent. The application to a series of Hessian
         matrices yields a time-dependent vector.
         """
 
-        assert isinstance(direction, fe.GenericVector), \
-           "Direction vector needs to be FEniCS vector."
-        assert (isinstance(outVec, hl.TimeDependentVector)
-           and np.array_equal(outVec.times, self._simTimes)), \
-           "Output vector needs to be TDV over simulation times."
+        assert isinstance(direction, fe.GenericVector), (
+            "Direction vector needs to be FEniCS vector."
+        )
+        assert isinstance(outVec, hl.TimeDependentVector) and np.array_equal(
+            outVec.times, self._simTimes
+        ), "Output vector needs to be TDV over simulation times."
         outVec.zero()
-        
+
         if isForward:
             derivativeInd = 0
             testDir = self._dummyTestFwd
@@ -983,13 +1116,18 @@ class TransientPDEVariationalProblem(hl.PDEProblem):
             derivativeInd = 1
             testDir = self._dummyTestAdj
 
-        for i in self._simTimeInds: 
+        for i in self._simTimeInds:
             forwardFunc = self._linPointFwd[i]
             adjointFunc = self._linPointAdj[i]
-            weakForm = self._weakFormHandle(forwardFunc, self._linPointParam, adjointFunc)
+            weakForm = self._weakFormHandle(
+                forwardFunc, self._linPointParam, adjointFunc
+            )
             derivativeFuncs = [forwardFunc, adjointFunc]
 
-            hessForm = fe.derivative(fe.derivative(weakForm, derivativeFuncs[derivativeInd], testDir),
-                                     self._linPointParam, self._dummyTrialParam)
+            hessForm = fe.derivative(
+                fe.derivative(weakForm, derivativeFuncs[derivativeInd], testDir),
+                self._linPointParam,
+                self._dummyTrialParam,
+            )
             hessMat = fe.assemble(hessForm)
             hessMat.mult(direction, outVec.data[i])

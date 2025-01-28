@@ -8,7 +8,7 @@ Classes:
 Logger: Logging class
 """
 
-#====================================== Preliminary Commands =======================================
+# ====================================== Preliminary Commands =======================================
 import inspect
 import os
 import warnings
@@ -23,7 +23,8 @@ with warnings.catch_warnings():
     import fenics as fe
     import hippylib as hl
 
-#========================================== Logger Class ===========================================
+
+# ========================================== Logger Class ===========================================
 class Logger:
     """Logging class
 
@@ -31,7 +32,7 @@ class Logger:
     Settings and general information are written into a log file, result arrays are saved in
     corresponding subdirectories. Screen printing and file writing can be independently enabled or
     disabled.
-    
+
     NOTE: This class is not a singleton, so be careful when using it in concurrent code.
 
     Attributes:
@@ -57,14 +58,16 @@ class Logger:
         "file_names": (list, None, False),
         "function_spaces": (list, None, False),
         "simulation_times": (np.ndarray, None, True),
-        "solution_data": (list, None, False)
+        "solution_data": (list, None, False),
     }
 
-    #-----------------------------------------------------------------------------------------------
-    def __init__(self,
-                 verbose: Optional[bool]=True,
-                 outDir: Optional[str]=None,
-                 printInterval: Optional[str]=1) -> None:
+    # -----------------------------------------------------------------------------------------------
+    def __init__(
+        self,
+        verbose: Optional[bool] = True,
+        outDir: Optional[str] = None,
+        printInterval: Optional[str] = 1,
+    ) -> None:
         """Constructor
 
         Sets up output directory, verbosity and print interval (only relevant for transient models).
@@ -87,7 +90,7 @@ class Logger:
             os.makedirs(self.outDir, exist_ok=True)
             self._logFile = os.path.join(self.outDir, self._logFileName)
 
-    #-----------------------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------
     def print_centered(self, message: Any, filler: str) -> None:
         """Prints heading to file
 
@@ -108,26 +111,25 @@ class Logger:
         try:
             width = min(os.get_terminal_size().columns, 60)
         except OSError:
-            width = 60  
+            width = 60
         if bool(message):
             message = " " + message + " "
 
         if self._verbose:
             print(message.center(width, filler), flush=True)
         if self._logFile is not None:
-            with open(self._logFile, 'a') as outFile:
+            with open(self._logFile, "a") as outFile:
                 print(message.center(width, filler), flush=True, file=outFile)
 
-    #-----------------------------------------------------------------------------------------------
-    def print_ljust(self, 
-                    message: Any, 
-                    width: Optional[int] = None,
-                    end: Optional[str] = "\n") -> None:
+    # -----------------------------------------------------------------------------------------------
+    def print_ljust(
+        self, message: Any, width: Optional[int] = None, end: Optional[str] = "\n"
+    ) -> None:
         """Prints structured output to console and log files
 
         Args:
             message (Any): Message to print
-            width (Optional[int], optional): Width of the string block. If None, this is 
+            width (Optional[int], optional): Width of the string block. If None, this is
                                              the length of the message. Defaults to None
             end (Optional[str], optional): End character of the string block. Defaults to "\n".
 
@@ -146,10 +148,10 @@ class Logger:
         if self._verbose:
             print(str(message).ljust(width), end=end, flush=True)
         if self._logFile is not None:
-            with open(self._logFile, 'a') as outFile:
+            with open(self._logFile, "a") as outFile:
                 print(str(message).ljust(width), end=end, flush=True, file=outFile)
 
-    #-----------------------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------
     def print_dict_to_file(self, heading: str, infoDict: dict[str, Any]) -> None:
         """Prints a settings dict to the log file
 
@@ -161,7 +163,7 @@ class Logger:
             TypeError: Checks type of the heading
             TypeError: Checks type of the dictionary
         """
-        
+
         leftSpace = 30
         rightSpace = 20
 
@@ -171,34 +173,38 @@ class Logger:
             raise TypeError("Object to print needs to be dictionary with string keys.")
 
         if self._logFile is not None:
-            with open(self._logFile, 'a') as outFile:
+            with open(self._logFile, "a") as outFile:
                 tableHead = f"{'Setting':<{leftSpace}} | {'Value':<{rightSpace}}"
                 outFile.write("\n --- " + heading + " --- " + "\n")
                 outFile.write(tableHead + "\n")
-                outFile.write("-"*len(tableHead) + "\n")
+                outFile.write("-" * len(tableHead) + "\n")
                 for key, value in infoDict.items():
                     if callable(value):
                         value = inspect.getsource(value)
                         value = (value.split(":", 1)[1]).split(",", 1)[0].strip()
-                    if hasattr(value, '__iter__'):
+                    if hasattr(value, "__iter__"):
                         if any(callable(entry) for entry in value):
                             value = inspect.getsource(value[0])
                             value = (value.split("[", 1)[1]).split("]", 1)[0].strip()
-                    outFile.write(f"{str(key):<{leftSpace}} | {str(value):<{rightSpace}}\n")
+                    outFile.write(
+                        f"{str(key):<{leftSpace}} | {str(value):<{rightSpace}}\n"
+                    )
                 outFile.write("\n")
 
-    #-----------------------------------------------------------------------------------------------
-    def log_solution(self,
-                     paramsToInfer: str,
-                     isStationary: bool,
-                     dataStructs: dict[str, Any],
-                     printInterval: Optional[int]=None,
-                     subDir: Optional[str]=None) -> Tuple[list[np.ndarray]]:
+    # -----------------------------------------------------------------------------------------------
+    def log_solution(
+        self,
+        paramsToInfer: str,
+        isStationary: bool,
+        dataStructs: dict[str, Any],
+        printInterval: Optional[int] = None,
+        subDir: Optional[str] = None,
+    ) -> Tuple[list[np.ndarray]]:
         """Logs the results of an inference procedure
 
         The standard results of an inference procedure are an array each for the parameter mean,
         the variance and the associated forward solution. The latter may also be time-dependent.
-        These arrays are written to files with the given names and into the previously set 
+        These arrays are written to files with the given names and into the previously set
         subdirectory.
         Before printing the results to files, this routine processes the input by forming numpy
         arrays of the solution values over the associated spacial domain. Thus, the returned
@@ -226,21 +232,23 @@ class Logger:
             TypeError: Checks type of solution arrays
 
         Returns:
-            Tuple[list[np.ndarray]]: Mean, variance and forward solution as numpy arrays, together 
-                                     with associated domain point values, ready for printing as 
+            Tuple[list[np.ndarray]]: Mean, variance and forward solution as numpy arrays, together
+                                     with associated domain point values, ready for printing as
                                      x-y-pairs
         """
 
         if paramsToInfer not in self._inferenceOpts:
-            raise ValueError("Inference options are: " +  ', '.join(self._inferenceOpts))
+            raise ValueError("Inference options are: " + ", ".join(self._inferenceOpts))
         if paramsToInfer == "all":
             numParams = 2
-        else: 
+        else:
             numParams = 1
 
         if not isStationary:
             if "simulation_times" not in dataStructs.keys():
-                raise KeyError("Need to provide simulation times for logging of transient solution.")
+                raise KeyError(
+                    "Need to provide simulation times for logging of transient solution."
+                )
             simTimes = dataStructs["simulation_times"]
 
         utils.check_settings_dict(dataStructs, self._checkDictLogSolution)
@@ -248,55 +256,78 @@ class Logger:
         fileNameList = dataStructs["file_names"]
         solArrayList = dataStructs["solution_data"]
 
-        if not (isinstance(funcSpaces, list) and len(funcSpaces) == 3
-        and all(isinstance(space, fe.FunctionSpace) for space in funcSpaces)):
-            raise TypeError("Funcspaces need to be list of three FEniCS function spaces.")
-        if not (isinstance(fileNameList, list) and len(funcSpaces) == 3
-        and all(isinstance(fileName, str) for fileName in fileNameList)):
+        if not (
+            isinstance(funcSpaces, list)
+            and len(funcSpaces) == 3
+            and all(isinstance(space, fe.FunctionSpace) for space in funcSpaces)
+        ):
+            raise TypeError(
+                "Funcspaces need to be list of three FEniCS function spaces."
+            )
+        if not (
+            isinstance(fileNameList, list)
+            and len(funcSpaces) == 3
+            and all(isinstance(fileName, str) for fileName in fileNameList)
+        ):
             raise TypeError("file names need to be list of three strings.")
-        if not (isinstance(solArrayList, list) and len(solArrayList) == 3
-        and isinstance(solArrayList[0], fe.GenericVector)
-        and isinstance(solArrayList[1], fe.GenericVector)
-        and isinstance(solArrayList[2], (fe.GenericVector, hl.TimeDependentVector))):
-            raise TypeError("Solution arrays need to be list of [Vector, Vector, Vector/TDV].")
+        if not (
+            isinstance(solArrayList, list)
+            and len(solArrayList) == 3
+            and isinstance(solArrayList[0], fe.GenericVector)
+            and isinstance(solArrayList[1], fe.GenericVector)
+            and isinstance(solArrayList[2], (fe.GenericVector, hl.TimeDependentVector))
+        ):
+            raise TypeError(
+                "Solution arrays need to be list of [Vector, Vector, Vector/TDV]."
+            )
 
         gridPointsState = funcSpaces[hl.STATE].tabulate_dof_coordinates().flatten()
         gridPointsParam = utils.reshape_to_np_format(
-            funcSpaces[hl.PARAMETER].tabulate_dof_coordinates(), numParams)[...,0]
+            funcSpaces[hl.PARAMETER].tabulate_dof_coordinates(), numParams
+        )[..., 0]
 
         meanFileName, varFileName, forwardFileName = fileNameList
         meanSol, varSol, forwardSol = solArrayList
-        meanHeading, varHeading, forwardHeading = self._get_default_headers(paramsToInfer)
-        
-        meanData = [gridPointsParam, utils.reshape_to_np_format(meanSol.get_local(), numParams)]
-        varianceData = [gridPointsParam, utils.reshape_to_np_format(varSol.get_local(), numParams)]
+        meanHeading, varHeading, forwardHeading = self._get_default_headers(
+            paramsToInfer
+        )
+
+        meanData = [
+            gridPointsParam,
+            utils.reshape_to_np_format(meanSol.get_local(), numParams),
+        ]
+        varianceData = [
+            gridPointsParam,
+            utils.reshape_to_np_format(varSol.get_local(), numParams),
+        ]
         self.print_arrays_to_file(meanFileName, meanHeading, meanData, subDir)
         self.print_arrays_to_file(varFileName, varHeading, varianceData, subDir)
 
         if isStationary:
             forwardData = [gridPointsState, forwardSol.get_local()]
-            self.print_arrays_to_file(forwardFileName, forwardHeading, forwardData, subDir)
+            self.print_arrays_to_file(
+                forwardFileName, forwardHeading, forwardData, subDir
+            )
         else:
             forwardData = [gridPointsState, simTimes, utils.tdv_to_nparray(forwardSol)]
-            self.log_transient_vector(forwardFileName,
-                                      forwardHeading,
-                                      forwardData,
-                                      printInterval,
-                                      subDir)
+            self.log_transient_vector(
+                forwardFileName, forwardHeading, forwardData, printInterval, subDir
+            )
 
         return meanData, varianceData, forwardData
 
-    #-----------------------------------------------------------------------------------------------
-    def log_transient_vector(self,
-                             fileName: str,
-                             heading: list[str],
-                             transientData: list[int, float, np.ndarray],
-                             printInterval: Optional[int]=None,
-                             subDir: Optional[str]=None) -> None:
-                             
+    # -----------------------------------------------------------------------------------------------
+    def log_transient_vector(
+        self,
+        fileName: str,
+        heading: list[str],
+        transientData: list[int, float, np.ndarray],
+        printInterval: Optional[int] = None,
+        subDir: Optional[str] = None,
+    ) -> None:
         """Writes transient vector to several output files
 
-        Transient vectors are written to several files, one for each time point deduced from the 
+        Transient vectors are written to several files, one for each time point deduced from the
         given time point array and the print interval. The name of each file is assembled from the
         provided name stem and a 't=[time]' appendix.
 
@@ -329,24 +360,27 @@ class Logger:
         if gridPoints.size == 1 and solVec.ndim == 1:
             solVec = np.expand_dims(solVec, axis=1)
         if not timePoints.shape[0] == solVec.shape[0]:
-            raise ValueError("Time points and solution need to have same length"
-                             " along first dimension")
+            raise ValueError(
+                "Time points and solution need to have same length"
+                " along first dimension"
+            )
 
         for i, t in enumerate(timePoints):
             if (i % piToUse == 0) or (t == timePoints[-1]):
-                currForwardData = [gridPoints, solVec[i,:]]
+                currForwardData = [gridPoints, solVec[i, :]]
                 currforwardFileName = fileName + "_t=" + str(t)
-                self.print_arrays_to_file(currforwardFileName, 
-                                          heading, 
-                                          currForwardData,
-                                          subDir)
+                self.print_arrays_to_file(
+                    currforwardFileName, heading, currForwardData, subDir
+                )
 
-    #-----------------------------------------------------------------------------------------------
-    def print_arrays_to_file(self, 
-                             fileName: str, 
-                             headingList: list[str], 
-                             arrayBlock: list[np.ndarray],
-                             subDir: Optional[str]=None) -> None:
+    # -----------------------------------------------------------------------------------------------
+    def print_arrays_to_file(
+        self,
+        fileName: str,
+        headingList: list[str],
+        arrayBlock: list[np.ndarray],
+        subDir: Optional[str] = None,
+    ) -> None:
         """Prints numpy array block to file
 
         It is assumed that the arrays are ordered column-wise, so that the standard 'numpy.savetxt'
@@ -371,11 +405,15 @@ class Logger:
 
         if not isinstance(fileName, (str, type(None))):
             raise TypeError("Output file name needs to be provided as string.")
-        if not (isinstance(headingList, list) 
-        and all(isinstance(headingEntry, str) for headingEntry in headingList)):
+        if not (
+            isinstance(headingList, list)
+            and all(isinstance(headingEntry, str) for headingEntry in headingList)
+        ):
             raise TypeError("Header list needs to be provided as list of strings.")
-        if not (isinstance(arrayBlock, list) 
-        and all(isinstance(array, (float, np.ndarray)) for array in arrayBlock)):
+        if not (
+            isinstance(arrayBlock, list)
+            and all(isinstance(array, (float, np.ndarray)) for array in arrayBlock)
+        ):
             raise TypeError("Array block needs to be provided as list of numpy arrays.")
         if not isinstance(subDir, (str, type(None))):
             raise TypeError("Subdirectory name needs to be provided as string.")
@@ -392,17 +430,19 @@ class Logger:
             file = os.path.join(concatDir, fileName) + "." + self._fileType
             heading = ""
             for headingPart in headingList:
-                heading += f"{headingPart:<{colSize+1}}"
+                heading += f"{headingPart:<{colSize + 1}}"
             heading += "\n"
-            
+
             with open(file, "w") as outFile:
                 outFile.write(heading)
-                np.savetxt(outFile, np.column_stack(arrayBlock), fmt=f'%+-{colSize}.{digits}e')
+                np.savetxt(
+                    outFile, np.column_stack(arrayBlock), fmt=f"%+-{colSize}.{digits}e"
+                )
 
-    #-----------------------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------
     def _get_default_headers(self, paramsToInfer: str) -> None:
         """Returns standard headings of array files for inference data"""
-        
+
         if paramsToInfer == "drift":
             meanHeading = ["x", "mean(f(x))"]
             varHeading = ["x", "var(f(x))"]
@@ -413,13 +453,15 @@ class Logger:
             meanHeading = ["x", "mean(f(x))", "mean(g^2(x))"]
             varHeading = ["x", "var(f(x))", "var(g^2(x))"]
         else:
-            raise ValueError("Unknown option for paramsToInfer. "
-                            "Valid options are 'drift', 'diffusion', 'all'")
+            raise ValueError(
+                "Unknown option for paramsToInfer. "
+                "Valid options are 'drift', 'diffusion', 'all'"
+            )
 
         forwardHeading = ["x", "forward(x)"]
         return meanHeading, varHeading, forwardHeading
 
-    #-----------------------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------
     @property
     def outDir(self) -> str:
         return self._outDir
@@ -428,7 +470,7 @@ class Logger:
     def verbose(self) -> bool:
         return self._verbose
 
-    #-----------------------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------
     @outDir.setter
     def outDir(self, outDir: str) -> None:
         if not isinstance(outDir, (str, type(None))):

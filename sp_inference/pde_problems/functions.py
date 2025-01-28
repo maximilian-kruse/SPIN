@@ -1,4 +1,4 @@
-""" Transient FEM Functions Module
+"""Transient FEM Functions Module
 
 This module provides low-level routines for the assembly and solving of transient FEM problems.
 The solver is rather flexible, in that in can be used to solve problems forwards and backwards in
@@ -15,7 +15,7 @@ assemble_transient: Assemble lhs and rhs structures for transient solve
 solve_transient
 """
 
-#====================================== Preliminary Commands =======================================
+# ====================================== Preliminary Commands =======================================
 import warnings
 import numpy as np
 from typing import Any, Tuple
@@ -29,27 +29,30 @@ with warnings.catch_warnings():
     import hippylib as hl
 
 
-#============================== Generic Transient Assembly and Solve ===============================
+# ============================== Generic Transient Assembly and Solve ===============================
 
 _checkDictProblem = {
     "init_sol": (fe.GenericVector, None, False),
     "time_step_size": ((int, float), [0, 1e10], False),
     "mass_matrix": (fe.Matrix, None, False),
     "rhs": (hl.TimeDependentVector, None, False),
-    "bcs": (list, None, False)
+    "bcs": (list, None, False),
 }
 
-#---------------------------------------------------------------------------------------------------
-def assemble_transient(funcSpace: fe.FunctionSpace, 
-                       timeStepSize: float,
-                       stationaryForm: ufl.Form,
-                       boundCondList: list[fe.DirichletBC]) -> Tuple:
+
+# ---------------------------------------------------------------------------------------------------
+def assemble_transient(
+    funcSpace: fe.FunctionSpace,
+    timeStepSize: float,
+    stationaryForm: ufl.Form,
+    boundCondList: list[fe.DirichletBC],
+) -> Tuple:
     """Constructs lhs matrix and rhs vector for transient solve
 
     Assuming a homogeneous rhs for the PDE above, a uniform time step leads to a discretization of
     the form :math:`\overbrace{(M + \Delta t K)}^A u^{n+1} = Mu^n - \Delta t L`, where :math:`K` results from the
     discretization of the bilinear part of the weak form of the spatial operator and :math``L from
-    its rhs contribution. This routine returns the matrix :math: `A` and the vector :math: `L`. 
+    its rhs contribution. This routine returns the matrix :math: `A` and the vector :math: `L`.
 
     Args:
         funcSpace (fe.FunctionSpace): Functions space of solution variable
@@ -68,13 +71,17 @@ def assemble_transient(funcSpace: fe.FunctionSpace,
     """
 
     if not isinstance(funcSpace, fe.FunctionSpace):
-        raise TypeError("Need valid FEniCS function space for trial and test functions.")
+        raise TypeError(
+            "Need valid FEniCS function space for trial and test functions."
+        )
     if not (isinstance(timeStepSize, float) and timeStepSize > 0):
         raise TypeError("Time step size needs to be positive float.")
     if not isinstance(stationaryForm, ufl.form.Form):
         raise TypeError("Need valid UFL form for stationary operator.")
-    if not ( isinstance(boundCondList, list) 
-    and all(isinstance(boundCond, fe.DirichletBC) for boundCond in boundCondList) ):
+    if not (
+        isinstance(boundCondList, list)
+        and all(isinstance(boundCond, fe.DirichletBC) for boundCond in boundCondList)
+    ):
         raise TypeError("Boundary conditions need to be list of FEniCS DirichletBC.")
 
     forwardVar = fe.TrialFunction(funcSpace)
@@ -96,11 +103,14 @@ def assemble_transient(funcSpace: fe.FunctionSpace,
 
     return lhsMatrix, rhsVector
 
-#---------------------------------------------------------------------------------------------------
-def solve_transient(simInds: np.ndarray,
-                    solver: fe.PETScLUSolver,
-                    problemStructs: dict[str, Any],
-                    resultVec: hl.TimeDependentVector) -> None:
+
+# ---------------------------------------------------------------------------------------------------
+def solve_transient(
+    simInds: np.ndarray,
+    solver: fe.PETScLUSolver,
+    problemStructs: dict[str, Any],
+    resultVec: hl.TimeDependentVector,
+) -> None:
     """Solves transient problem over time index array
 
     The ordering of the time indices determines whether problem is solved forwards or backwards
@@ -122,11 +132,13 @@ def solve_transient(simInds: np.ndarray,
     """
 
     if not isinstance(simInds, np.ndarray):
-        raise TypeError("Simulation time indices need to be provided as numpy array of ints.")
+        raise TypeError(
+            "Simulation time indices need to be provided as numpy array of ints."
+        )
     if not isinstance(solver, fe.cpp.la.GenericLinearSolver):
-        raise TypeError("Routine requires initialized Linear solver.")        
+        raise TypeError("Routine requires initialized Linear solver.")
     utils.check_settings_dict(problemStructs, _checkDictProblem)
-    
+
     initSol = problemStructs["init_sol"]
     dt = problemStructs["time_step_size"]
     massMatrix = problemStructs["mass_matrix"]

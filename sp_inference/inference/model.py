@@ -1,4 +1,4 @@
-""" Linearized inference wrapper
+"""Linearized inference wrapper
 
 This module contains a wrapper class for the linearized bayesian inference of drift and/or diffusion
 functions for stochastic processes. It provides the highest level access to the SP Inference
@@ -12,7 +12,7 @@ Classes:
 SDEInferenceModel: Wrapper class for stochastic process inference
 """
 
-#====================================== Preliminary Commands =======================================
+# ====================================== Preliminary Commands =======================================
 import warnings
 from typing import Any, Callable, Optional, Tuple, Union
 
@@ -29,7 +29,8 @@ with warnings.catch_warnings():
     import fenics as fe
     import hippylib as hl
 
-#=========================================== Base Class ============================================
+
+# =========================================== Base Class ============================================
 class SDEInferenceModel:
     """Linearized inference model wrapper for stochastic processes
 
@@ -78,7 +79,7 @@ class SDEInferenceModel:
         get_prior_info:
             Gets prior mean function and point-wise variance field
     """
-    
+
     _domainDim = 1
     _printWidth = 35
     _numericTol = fe.DOLFIN_EPS
@@ -91,27 +92,27 @@ class SDEInferenceModel:
         "params_to_infer": (str, None, False),
         "model_type": (str, None, False),
         "is_stationary": (bool, None, False),
-        "verbose": (bool, None, True)
+        "verbose": (bool, None, True),
     }
 
     _checkDictPrior = {
         "mean_function": ((Callable, list), None, False),
-        "robin_bc": (bool, None, False)
+        "robin_bc": (bool, None, False),
     }
 
     _checkDictFE = {
         "num_mesh_points": ((int, list), None, False),
         "boundary_locations": (list, None, False),
         "boundary_values": (list, None, False),
-        "element_degrees": (list, None, False),  
+        "element_degrees": (list, None, False),
         "drift_function": (Callable, None, True),
-        "squared_diffusion_function": (Callable, None, True)
+        "squared_diffusion_function": (Callable, None, True),
     }
 
     _checkDictMisfit = {
         "data_locations": ((int, float, np.ndarray), None, False),
         "data_times": ((int, float, np.ndarray), None, True),
-        "data_values": ((int, float, np.ndarray), None, False)
+        "data_values": ((int, float, np.ndarray), None, False),
     }
 
     _checkDictSolver = {
@@ -121,33 +122,35 @@ class SDEInferenceModel:
         "max_iter": (int, [1, 1e10], False),
         "GN_iter": (int, [1, 1e10], False),
         "c_armijo": ((int, float), [0, 1e10], False),
-        "max_backtracking_iter": (int, [1, 1e10], False)
+        "max_backtracking_iter": (int, [1, 1e10], False),
     }
 
     _checkDictHessian = {
         "num_eigvals": (int, [1, 1e10], False),
-        "num_oversampling": (int, [1, 1e10], False)
+        "num_oversampling": (int, [1, 1e10], False),
     }
 
     _checkDictTransient = {
-        "start_time": ((int,float), [-1e10, 1e10], False),
-        "end_time": ((int,float), [-1e10, 1e10], False),
-        "time_step_size": ((int,float), [_numericTol, 1e10], False),
-        "initial_condition": ((Callable, fe.GenericVector), None, False)
+        "start_time": ((int, float), [-1e10, 1e10], False),
+        "end_time": ((int, float), [-1e10, 1e10], False),
+        "time_step_size": ((int, float), [_numericTol, 1e10], False),
+        "initial_condition": ((Callable, fe.GenericVector), None, False),
     }
 
-    #-----------------------------------------------------------------------------------------------
-    def __init__(self,
-                 modelSettings: dict[str, Any],       
-                 priorSettings: dict[str, Any],
-                 feSettings: dict[str, Any], 
-                 misfitSettings: dict[str, Any],
-                 transientSettings: Optional[dict[str, Any]]=None,
-                 logger: Optional[logging.Logger]=None) -> None:
+    # -----------------------------------------------------------------------------------------------
+    def __init__(
+        self,
+        modelSettings: dict[str, Any],
+        priorSettings: dict[str, Any],
+        feSettings: dict[str, Any],
+        misfitSettings: dict[str, Any],
+        transientSettings: Optional[dict[str, Any]] = None,
+        logger: Optional[logging.Logger] = None,
+    ) -> None:
         """Constructor of SDE inference wrapper class
 
-        The constructor is a centralized initialization point. It takes some general settings as 
-        well as settings for all model components. Subsequently, it initializes the logger and 
+        The constructor is a centralized initialization point. It takes some general settings as
+        well as settings for all model components. Subsequently, it initializes the logger and
         calls all construction routines.
 
         Args:
@@ -193,11 +196,11 @@ class SDEInferenceModel:
         utils.check_settings_dict(modelSettings, self._checkDictModel)
 
         if modelSettings["params_to_infer"] not in self._inferenceOpts:
-            raise ValueError("Inference options are: " +  ', '.join(self._inferenceOpts))
+            raise ValueError("Inference options are: " + ", ".join(self._inferenceOpts))
         self.paramsToInfer = modelSettings["params_to_infer"]
         self.isStationary = modelSettings["is_stationary"]
-        self._weakForm, self._solutionDim = forms.get_form(modelSettings["model_type"]) 
-        
+        self._weakForm, self._solutionDim = forms.get_form(modelSettings["model_type"])
+
         self._logger.print_centered("Invoke Inference Model", "=")
         self._logger.print_ljust("")
 
@@ -206,10 +209,12 @@ class SDEInferenceModel:
         self.misfitFunctional = self.construct_misfit(misfitSettings)
         self._logger.print_ljust("")
 
-    #-----------------------------------------------------------------------------------------------
-    def construct_pde_problem(self, 
-                              feSettings: dict[str, Any], 
-                              transientSettings: Optional[dict[str, Any]]=None) -> hl.PDEProblem:
+    # -----------------------------------------------------------------------------------------------
+    def construct_pde_problem(
+        self,
+        feSettings: dict[str, Any],
+        transientSettings: Optional[dict[str, Any]] = None,
+    ) -> hl.PDEProblem:
         """Sets up variational pde problem
 
         This method sets up the variational pde problem necessary for the MAP optimization problem.
@@ -236,12 +241,20 @@ class SDEInferenceModel:
             hl.PDEProblem: PDE variational problem
         """
 
-        self._logger.print_ljust("Construct PDE Problem:", width=self._printWidth, end="")
+        self._logger.print_ljust(
+            "Construct PDE Problem:", width=self._printWidth, end=""
+        )
         self._logger.print_dict_to_file("FEM Problem Settings", feSettings)
 
-        if self.paramsToInfer == "drift" and "squared_diffusion_function" not in feSettings.keys():
+        if (
+            self.paramsToInfer == "drift"
+            and "squared_diffusion_function" not in feSettings.keys()
+        ):
             raise ValueError("Need to specify diffusion for drift inference.")
-        if self.paramsToInfer == "diffusion" and "drift_function" not in feSettings.keys():
+        if (
+            self.paramsToInfer == "diffusion"
+            and "drift_function" not in feSettings.keys()
+        ):
             raise ValueError("Need to specify drift for diffusion inference.")
 
         femProblem = problems.FEMProblem(self._domainDim, self._solutionDim, feSettings)
@@ -249,35 +262,42 @@ class SDEInferenceModel:
         variationalForm = self._construct_variational_form(feSettings, femProblem)
 
         if self.isStationary:
-            pdeProblem = hl.PDEVariationalProblem(self.funcSpaces, 
-                                                  variationalForm,
-                                                  femProblem.boundCondsForward,
-                                                  femProblem.boundCondAdjoint,
-                                                  is_fwd_linear=True)
+            pdeProblem = hl.PDEVariationalProblem(
+                self.funcSpaces,
+                variationalForm,
+                femProblem.boundCondsForward,
+                femProblem.boundCondAdjoint,
+                is_fwd_linear=True,
+            )
         else:
             tStart = transientSettings["start_time"]
             tEnd = transientSettings["end_time"]
             dt = transientSettings["time_step_size"]
-            initFunc = fee.convert_to_np_callable(transientSettings["initial_condition"],
-                                                  self._domainDim)
-            self.simTimes = np.arange(tStart, tEnd+dt, dt)
+            initFunc = fee.convert_to_np_callable(
+                transientSettings["initial_condition"], self._domainDim
+            )
+            self.simTimes = np.arange(tStart, tEnd + dt, dt)
 
-            pdeProblem = transient.TransientPDEVariationalProblem(self.funcSpaces, 
-                                                                  variationalForm,
-                                                                  femProblem.boundCondsForward, 
-                                                                  femProblem.boundCondAdjoint,
-                                                                  initFunc,
-                                                                  self.simTimes)
+            pdeProblem = transient.TransientPDEVariationalProblem(
+                self.funcSpaces,
+                variationalForm,
+                femProblem.boundCondsForward,
+                femProblem.boundCondAdjoint,
+                initFunc,
+                self.simTimes,
+            )
 
-        assert isinstance(pdeProblem, hl.PDEProblem), \
+        assert isinstance(pdeProblem, hl.PDEProblem), (
             "PDE problem has not been constructed correctly."
+        )
 
         self._logger.print_ljust("Successful", end="\n\n")
         return pdeProblem
 
-    #-----------------------------------------------------------------------------------------------
-    def construct_prior(self, priorSettings: dict[str, Any]) \
-        -> hl.modeling.prior.SqrtPrecisionPDE_Prior:
+    # -----------------------------------------------------------------------------------------------
+    def construct_prior(
+        self, priorSettings: dict[str, Any]
+    ) -> hl.modeling.prior.SqrtPrecisionPDE_Prior:
         """Sets up Prior with mean function and precision operator
 
         Sets up a Gaussian functional prior :math:`\mu_{prior}~N(m_{prior}, C_{prior})`.
@@ -291,7 +311,7 @@ class SDEInferenceModel:
                 -> mean_function (Callable): Prior mean function
                 -> gamma (float): Variance field tuning parameter
                 -> delta (float): Variance field tuning parameter
-                -> robin_bc (bool): Use Robin BCs for precision operator action to mitigate 
+                -> robin_bc (bool): Use Robin BCs for precision operator action to mitigate
                                     boundary effects.
 
         Raises:
@@ -302,32 +322,38 @@ class SDEInferenceModel:
         """
 
         self._logger.print_ljust("Construct Prior:", width=self._printWidth, end="")
-        self._logger.print_dict_to_file("Prior Settings", priorSettings)       
-        
+        self._logger.print_dict_to_file("Prior Settings", priorSettings)
+
         funcSpaceParam = self.funcSpaces[hl.PARAMETER]
         if funcSpaceParam.num_sub_spaces() == 1:
             funcSpaceParam = funcSpaceParam.extract_sub_space([0]).collapse()
 
-        priorMeanFunc = fee.convert_to_fe_function(priorSettings["mean_function"],
-                                                   funcSpaceParam)
-        gamma, delta = hl.BiLaplacianComputeCoefficients(priorSettings["variance"],
-                                                         priorSettings["correlation_length"],
-                                                         funcSpaceParam)
+        priorMeanFunc = fee.convert_to_fe_function(
+            priorSettings["mean_function"], funcSpaceParam
+        )
+        gamma, delta = hl.BiLaplacianComputeCoefficients(
+            priorSettings["variance"],
+            priorSettings["correlation_length"],
+            funcSpaceParam,
+        )
 
-        prior = hl.BiLaplacianPrior(funcSpaceParam,
-                                    gamma,
-                                    delta,
-                                    mean=priorMeanFunc.vector(),
-                                    robin_bc=priorSettings["robin_bc"],
-                                    robin_const=priorSettings["robin_bc_const"])
+        prior = hl.BiLaplacianPrior(
+            funcSpaceParam,
+            gamma,
+            delta,
+            mean=priorMeanFunc.vector(),
+            robin_bc=priorSettings["robin_bc"],
+            robin_const=priorSettings["robin_bc_const"],
+        )
 
-        assert isinstance(prior, hl.modeling.prior.SqrtPrecisionPDE_Prior), \
+        assert isinstance(prior, hl.modeling.prior.SqrtPrecisionPDE_Prior), (
             "Prior has not been constructed correctly."
+        )
 
         self._logger.print_ljust("Successful", end="\n\n")
         return prior
 
-    #-----------------------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------
     def construct_misfit(self, misfitSettings: dict[str, Any]) -> hl.Misfit:
         """Sets up misfit functional
 
@@ -335,7 +361,7 @@ class SDEInferenceModel:
         solution of the associated PDE problem. The resulting object additionally provides first
         and second variation w.r.t. the forward solution, which is necessary for the computation of
         the MAP. The misfit functional is defined as the norm of the difference between data and
-        forward solution, weighted by a diagonal noise covariance operator, 
+        forward solution, weighted by a diagonal noise covariance operator,
         :math: `||F(m)-d||^2_{\Tau_{noise}^-1}`.
         For transient problems, the misfit is summed over all observation times.
 
@@ -355,12 +381,14 @@ class SDEInferenceModel:
         """
 
         utils.check_settings_dict(misfitSettings, self._checkDictMisfit)
-        self._logger.print_ljust("Construct Misfit:", width=self._printWidth, end="")     
-        
+        self._logger.print_ljust("Construct Misfit:", width=self._printWidth, end="")
+
         if self.isStationary:
-            misfitFunctional = hl.PointwiseStateObservation(self.funcSpaces[hl.STATE],
-                                                            misfitSettings["data_locations"],
-                                                            misfitSettings["data_var"])
+            misfitFunctional = hl.PointwiseStateObservation(
+                self.funcSpaces[hl.STATE],
+                misfitSettings["data_locations"],
+                misfitSettings["data_var"],
+            )
 
             data = utils.reshape_to_fe_format(misfitSettings["data_values"])
             misfitFunctional.d.set_local(data)
@@ -369,42 +397,50 @@ class SDEInferenceModel:
                 raise KeyError("Key 'data_times' missing for transient solve.")
             numSpacePoints = misfitSettings["data_locations"].size
             numTimePoints = misfitSettings["data_times"].size
-            misfitFunctional = \
-                transient.TransientPointwiseStateObservation(self.funcSpaces[hl.STATE],
-                                                             misfitSettings["data_locations"],
-                                                             misfitSettings["data_times"],
-                                                             self.simTimes,
-                                                             noiseVar
-                                                             =misfitSettings["data_var"])
+            misfitFunctional = transient.TransientPointwiseStateObservation(
+                self.funcSpaces[hl.STATE],
+                misfitSettings["data_locations"],
+                misfitSettings["data_times"],
+                self.simTimes,
+                noiseVar=misfitSettings["data_var"],
+            )
             inputData = misfitSettings["data_values"]
             if self._solutionDim > 1:
-                if not inputData.shape == (numSpacePoints, self._solutionDim, numTimePoints):
+                if not inputData.shape == (
+                    numSpacePoints,
+                    self._solutionDim,
+                    numTimePoints,
+                ):
                     raise ValueError("Data array has wrong shape.")
-                structuredData = np.array((numSpacePoints*self._solutionDim, numTimePoints))
+                structuredData = np.array(
+                    (numSpacePoints * self._solutionDim, numTimePoints)
+                )
 
                 for i in range(numTimePoints):
-                    structuredData[:, i] = utils.reshape_to_fe_format(inputData[:,:,i],
-                                                                      self._solutionDim)
+                    structuredData[:, i] = utils.reshape_to_fe_format(
+                        inputData[:, :, i], self._solutionDim
+                    )
             else:
                 structuredData = inputData
             misfitFunctional.d = structuredData
-        
-        assert isinstance(misfitFunctional, hl.Misfit), \
+
+        assert isinstance(misfitFunctional, hl.Misfit), (
             "Misfit functional has not been constructed correctly."
+        )
 
         self._logger.print_ljust("Successful", end="\n\n")
         return misfitFunctional
 
-    #-----------------------------------------------------------------------------------------------
-    def compute_gr_posterior(self, 
-                             solverSettings: dict[str, Any], 
-                             hessianSettings: dict[str, Any]) -> Tuple[list[np.ndarray]]:
-        """ Computes the MAP of the linearized inference problem
+    # -----------------------------------------------------------------------------------------------
+    def compute_gr_posterior(
+        self, solverSettings: dict[str, Any], hessianSettings: dict[str, Any]
+    ) -> Tuple[list[np.ndarray]]:
+        """Computes the MAP of the linearized inference problem
 
-        This is the main "run" method for conducting the linearized Bayesian inference. It computes 
+        This is the main "run" method for conducting the linearized Bayesian inference. It computes
         the MAP for the Gaussian approximation of the inversion problem through a minimization of
         the log posterior. This optimization is performed by an inexact Newton-CG algorithm, which
-        requires the first and second variations of the problem components (pde constraint, 
+        requires the first and second variations of the problem components (pde constraint,
         likelihood, prior). Furthermore, the algorithm employs a globalization strategy in the form
         of Armijo line search.
         After the determination of the MAP "point", the routine computes a low-rank approximation of
@@ -441,37 +477,45 @@ class SDEInferenceModel:
         self._logger.print_ljust("")
         self._logger.print_dict_to_file("Solver Settings", solverSettings)
         self._logger.print_dict_to_file("Hessian Settings", hessianSettings)
-        
-        assert isinstance(self.inferenceModel, hl.Model), \
-            "Inference model has not been constructed correctly."
 
-        mapForward, mapParam, mapAdjoint = self._compute_map(solverSettings)   
-        hessEigVals, hessEigVecs = self._compute_reduced_hessian([mapForward, mapParam, mapAdjoint],
-                                                                  hessianSettings)
+        assert isinstance(self.inferenceModel, hl.Model), (
+            "Inference model has not been constructed correctly."
+        )
+
+        mapForward, mapParam, mapAdjoint = self._compute_map(solverSettings)
+        hessEigVals, hessEigVecs = self._compute_reduced_hessian(
+            [mapForward, mapParam, mapAdjoint], hessianSettings
+        )
         self.grPosterior = hl.GaussianLRPosterior(self.prior, hessEigVals, hessEigVecs)
 
-        assert isinstance(self.grPosterior, hl.GaussianLRPosterior), \
+        assert isinstance(self.grPosterior, hl.GaussianLRPosterior), (
             "Posterior has not been constructed correctly."
+        )
         self._logger.print_ljust("")
 
         self.grPosterior.mean = mapParam
-        mapPwVariance, _, _ = self.grPosterior.pointwise_variance(method="Randomized", r=200)
+        mapPwVariance, _, _ = self.grPosterior.pointwise_variance(
+            method="Randomized", r=200
+        )
 
-        dataStructs = {"file_names": self._mapFileNames,
-                       "function_spaces": self.funcSpaces,
-                       "solution_data": [mapParam, mapPwVariance, mapForward]}
+        dataStructs = {
+            "file_names": self._mapFileNames,
+            "function_spaces": self.funcSpaces,
+            "solution_data": [mapParam, mapPwVariance, mapForward],
+        }
         if not self.isStationary:
             dataStructs["simulation_times"] = self.simTimes
-        
-        mapMeanData, mapVarianceData, mapForwardData = \
-            self._logger.log_solution(paramsToInfer=self.paramsToInfer,
-                                      isStationary=self.isStationary,
-                                      dataStructs=dataStructs,
-                                      subDir=self._subDir)
+
+        mapMeanData, mapVarianceData, mapForwardData = self._logger.log_solution(
+            paramsToInfer=self.paramsToInfer,
+            isStationary=self.isStationary,
+            dataStructs=dataStructs,
+            subDir=self._subDir,
+        )
 
         return mapMeanData, mapVarianceData, mapForwardData, hessEigVals
 
-    #-----------------------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------
     def check_gradient(self, paramFunc: str) -> fe.Function:
         """Computes the gradient of the PDE constraint form w.r.t. a given parameter function
 
@@ -485,8 +529,9 @@ class SDEInferenceModel:
             fe.Function: Gradient function
         """
 
-        assert isinstance(self.inferenceModel, hl.Model), \
+        assert isinstance(self.inferenceModel, hl.Model), (
             "Inference model has not been constructed correctly."
+        )
 
         forwardVec = self.inferenceModel.generate_vector(hl.STATE)
         adjointVec = self.inferenceModel.generate_vector(hl.ADJOINT)
@@ -497,11 +542,13 @@ class SDEInferenceModel:
         self.inferenceModel.solveAdj(adjointVec, [forwardVec, paramVec, None])
 
         paramGrad = self.inferenceModel.generate_vector(hl.PARAMETER)
-        self.pdeProblem.evalGradientParameter([forwardVec, paramVec, adjointVec], paramGrad)
+        self.pdeProblem.evalGradientParameter(
+            [forwardVec, paramVec, adjointVec], paramGrad
+        )
         paramGradFunc = hl.vector2Function(paramGrad, self.funcSpaces[hl.PARAMETER])
         return paramGradFunc
 
-    #-----------------------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------
     def get_prior_info(self, method: str) -> Tuple[fe.Function, fe.Function]:
         """Returns prior mean and point-wise variance function
 
@@ -527,21 +574,24 @@ class SDEInferenceModel:
         forwardVec = self.inferenceModel.generate_vector(hl.STATE)
         self.inferenceModel.solveFwd(forwardVec, [None, self.prior.mean, None])
 
-        dataStructs = {"file_names": self._priorFileNames,
-                       "function_spaces": self.funcSpaces,
-                       "solution_data": [meanVec, varVec, forwardVec]}
+        dataStructs = {
+            "file_names": self._priorFileNames,
+            "function_spaces": self.funcSpaces,
+            "solution_data": [meanVec, varVec, forwardVec],
+        }
         if not self.isStationary:
             dataStructs["simulation_times"] = self.simTimes
-        
-        priorMeanData, priorVarianceData, priorForwardData = \
-            self._logger.log_solution(paramsToInfer=self.paramsToInfer,
-                                      isStationary=self.isStationary,
-                                      dataStructs=dataStructs,
-                                      subDir=self._subDir)
+
+        priorMeanData, priorVarianceData, priorForwardData = self._logger.log_solution(
+            paramsToInfer=self.paramsToInfer,
+            isStationary=self.isStationary,
+            dataStructs=dataStructs,
+            subDir=self._subDir,
+        )
 
         return priorMeanData, priorVarianceData, priorForwardData
 
-    #-----------------------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------
     def _set_up_funcspaces(self, femProblem: problems.FEMProblem) -> None:
         """Sets up function spaces
 
@@ -555,13 +605,13 @@ class SDEInferenceModel:
             funcSpaceParam = femProblem.funcSpaceDiffusion
         elif self.paramsToInfer == "all":
             funcSpaceParam = femProblem.funcSpaceAll
-        
+
         return [femProblem.funcSpaceVar, funcSpaceParam, femProblem.funcSpaceVar]
 
-    #-----------------------------------------------------------------------------------------------
-    def _construct_variational_form(self,
-                                    feSettings: dict[str, Any],
-                                    femProblem: problems.FEMProblem) -> Callable:
+    # -----------------------------------------------------------------------------------------------
+    def _construct_variational_form(
+        self, feSettings: dict[str, Any], femProblem: problems.FEMProblem
+    ) -> Callable:
         """Constructs a suitable variational form
 
         Depending on the inference mode, one parameter function in the variational form might be
@@ -569,68 +619,87 @@ class SDEInferenceModel:
         """
 
         if self.paramsToInfer == "drift":
-            diff_array = fee.convert_to_np_array(feSettings["squared_diffusion_function"],
-                                                 femProblem.funcSpaceDiffusion)
+            diff_array = fee.convert_to_np_array(
+                feSettings["squared_diffusion_function"], femProblem.funcSpaceDiffusion
+            )
             diff_array = np.exp(diff_array)
-            diff_func = fee.create_fe_function_from_np_array(diff_array,
-                                                             femProblem.funcSpaceDiffusion)
+            diff_func = fee.create_fe_function_from_np_array(
+                diff_array, femProblem.funcSpaceDiffusion
+            )
             self._fixedParamFunction = diff_func
-            return  self._form_wrapper_drift
+            return self._form_wrapper_drift
         elif self.paramsToInfer == "diffusion":
-            drift_func = fee.convert_to_fe_function(feSettings["drift_function"],
-                                                   femProblem.funcSpaceDrift)
+            drift_func = fee.convert_to_fe_function(
+                feSettings["drift_function"], femProblem.funcSpaceDrift
+            )
             self._fixedParamFunction = drift_func
-            return  self._form_wrapper_diffusion
+            return self._form_wrapper_diffusion
         elif self.paramsToInfer == "all":
             return self._form_wrapper_all
 
-    #-----------------------------------------------------------------------------------------------
-    def _form_wrapper_drift(self, forwardVar: Any, paramVar: Any, adjointVar: Any) -> Any:
+    # -----------------------------------------------------------------------------------------------
+    def _form_wrapper_drift(
+        self, forwardVar: Any, paramVar: Any, adjointVar: Any
+    ) -> Any:
         """Variational form wrapper for drift function inference"""
 
-        assert self._fixedParamFunction is not None, \
+        assert self._fixedParamFunction is not None, (
             "Diffusion function is not set, use construct function."
-        return self._weakForm(forwardVar, paramVar, self._fixedParamFunction, adjointVar)
+        )
+        return self._weakForm(
+            forwardVar, paramVar, self._fixedParamFunction, adjointVar
+        )
 
-    #-----------------------------------------------------------------------------------------------
-    def _form_wrapper_diffusion(self, forwardVar: Any, paramVar: Any, adjointVar: Any) -> Any:
+    # -----------------------------------------------------------------------------------------------
+    def _form_wrapper_diffusion(
+        self, forwardVar: Any, paramVar: Any, adjointVar: Any
+    ) -> Any:
         """Variational form wrapper for diffusion function inference"""
 
-        assert self._fixedParamFunction is not None, \
+        assert self._fixedParamFunction is not None, (
             "Drift function is not set, use construct function."
-        return self._weakForm(forwardVar, self._fixedParamFunction, paramVar, adjointVar)
+        )
+        return self._weakForm(
+            forwardVar, self._fixedParamFunction, paramVar, adjointVar
+        )
 
-    #-----------------------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------
     def _form_wrapper_all(self, forwardVar: Any, paramVar: Any, adjointVar: Any) -> Any:
         """Variational form wrapper for inference of drift and diffusion"""
 
         numElems = int(0.5 * self._domainDim * (self._domainDim + 1)) + self._domainDim
-        assert paramVar.ufl_shape[0] == numElems, \
+        assert paramVar.ufl_shape[0] == numElems, (
             "Mixed parameter function has wrong shape"
+        )
 
         if self._domainDim == 1:
             driftVar = fe.as_vector((paramVar[0],))
             diffVar = fe.as_matrix(((fe.exp(paramVar[1]),),))
         elif self._domainDim == 2:
             driftVar = fe.as_vector((paramVar[0], paramVar[1]))
-            diffVar = fe.as_matrix(((fe.exp(paramVar[2]), fe.exp(paramVar[3])),
-                                    (fe.exp(paramVar[3]), fe.exp(paramVar[4]))))
+            diffVar = fe.as_matrix(
+                (
+                    (fe.exp(paramVar[2]), fe.exp(paramVar[3])),
+                    (fe.exp(paramVar[3]), fe.exp(paramVar[4])),
+                )
+            )
 
         return self._weakForm(forwardVar, driftVar, diffVar, adjointVar)
-               
-    #-----------------------------------------------------------------------------------------------
+
+    # -----------------------------------------------------------------------------------------------
     def _compute_map(self, solverSettings: dict[str, Any]) -> list[Any]:
         """Computes the MAP with Newton-CG algorithm
-        
-        Note that the globalization option "LS" (line search) is hard-coded. An alternative from 
+
+        Note that the globalization option "LS" (line search) is hard-coded. An alternative from
         hIPPYlib is "TS" (trust region).
         """
 
         self._logger.print_ljust("Solve for MAP:")
 
         if "initial_guess" in solverSettings.keys():
-            initFunc = fee.convert_to_fe_function(solverSettings["initial_guess"],
-                                                  self.funcSpaces[hl.PARAMETER])
+            initFunc = fee.convert_to_fe_function(
+                solverSettings["initial_guess"], self.funcSpaces[hl.PARAMETER]
+            )
             initParam = initFunc.vector()
         else:
             initParam = self.prior.mean.copy()
@@ -642,18 +711,23 @@ class SDEInferenceModel:
         solver.parameters["GN_iter"] = solverSettings["GN_iter"]
         solver.parameters["globalization"] = "LS"
         solver.parameters["LS"]["c_armijo"] = solverSettings["c_armijo"]
-        solver.parameters["LS"]["max_backtracking_iter"] = solverSettings["max_backtracking_iter"]
-        solver.parameters["print_level"] = self._logger.verbose-1
+        solver.parameters["LS"]["max_backtracking_iter"] = solverSettings[
+            "max_backtracking_iter"
+        ]
+        solver.parameters["print_level"] = self._logger.verbose - 1
 
         [mapSol, mapParam, mapAdj] = solver.solve([None, initParam, None])
-        assert isinstance([mapSol, mapParam, mapAdj], list), \
+        assert isinstance([mapSol, mapParam, mapAdj], list), (
             "Solver has not produced proper solution vectors."
+        )
 
         if solver.converged:
-            self._logger.print_ljust("\nConverged in " + str(solver.it) + " iterations.")
+            self._logger.print_ljust(
+                "\nConverged in " + str(solver.it) + " iterations."
+            )
         else:
             self._logger.print_ljust("\nNot Converged")
-        
+
         self._logger.print_ljust("Termination reason:", width=self._printWidth, end="")
         self._logger.print_ljust(f"{solver.termination_reasons[solver.reason]}")
         self._logger.print_ljust("Final gradient norm:", width=self._printWidth, end="")
@@ -663,33 +737,46 @@ class SDEInferenceModel:
 
         return [mapSol, mapParam, mapAdj]
 
-    #-----------------------------------------------------------------------------------------------
-    def _compute_reduced_hessian(self, mapVars: list, hessianSettings: dict[str, Any]) \
-        -> list[np.ndarray, hl.MultiVector]:
+    # -----------------------------------------------------------------------------------------------
+    def _compute_reduced_hessian(
+        self, mapVars: list, hessianSettings: dict[str, Any]
+    ) -> list[np.ndarray, hl.MultiVector]:
         """Computes low-rank approximation of the posterior Hessian at the MAP point
-        
+
         The chosen algorithm is a randomized double-pass procedure. hIPPYlib also provides a
         single-pass alternative.
         """
 
-        self._logger.print_ljust("Construct Reduced Hessian:", width=self._printWidth, end="")
+        self._logger.print_ljust(
+            "Construct Reduced Hessian:", width=self._printWidth, end=""
+        )
 
-        self.inferenceModel.setPointForHessianEvaluations(mapVars, gauss_newton_approx=False)
+        self.inferenceModel.setPointForHessianEvaluations(
+            mapVars, gauss_newton_approx=False
+        )
         misfitHessian = hl.ReducedHessian(self.inferenceModel, misfit_only=True)
 
-        randMultiVec = hl.MultiVector(mapVars[1], hessianSettings["num_eigvals"]
-                                      + hessianSettings["num_oversampling"])
-        hl.parRandom.normal(1., randMultiVec)
-        eigVals, eigVecs = hl.doublePassG(misfitHessian, self.prior.R, self.prior.Rsolver,
-                                          randMultiVec, hessianSettings["num_eigvals"])
+        randMultiVec = hl.MultiVector(
+            mapVars[1],
+            hessianSettings["num_eigvals"] + hessianSettings["num_oversampling"],
+        )
+        hl.parRandom.normal(1.0, randMultiVec)
+        eigVals, eigVecs = hl.doublePassG(
+            misfitHessian,
+            self.prior.R,
+            self.prior.Rsolver,
+            randMultiVec,
+            hessianSettings["num_eigvals"],
+        )
 
-        assert isinstance(eigVals, np.ndarray) and isinstance(eigVecs, hl.MultiVector), \
-            "Solver has not produced a proper solution."
+        assert isinstance(eigVals, np.ndarray) and isinstance(
+            eigVecs, hl.MultiVector
+        ), "Solver has not produced a proper solution."
 
         self._logger.print_ljust("Successful", end="\n\n")
         return [eigVals, eigVecs]
 
-    #-----------------------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------
     @property
     def isStationary(self) -> bool:
         if self._isStationary is None:
@@ -701,7 +788,7 @@ class SDEInferenceModel:
         if self._paramsToInfer is None:
             raise ValueError("Property has not been initialized.")
         return self._paramsToInfer
-    
+
     @property
     def simTimes(self) -> Union[np.ndarray, None]:
         if self._simTimes is None:
@@ -719,7 +806,7 @@ class SDEInferenceModel:
         if self._prior is None:
             raise ValueError("Property has not been initialized.")
         return self._prior
-    
+
     @property
     def pdeProblem(self) -> hl.PDEProblem:
         if self._pdeProblem is None:
@@ -736,10 +823,14 @@ class SDEInferenceModel:
     def inferenceModel(self) -> hl.Model:
         if self._inferenceModel is None:
             try:
-                self._inferenceModel = hl.Model(self.pdeProblem, self.prior, self.misfitFunctional)
+                self._inferenceModel = hl.Model(
+                    self.pdeProblem, self.prior, self.misfitFunctional
+                )
             except:
-                raise ValueError("Need to initialize PDE problem, prior and misfit functional for "
-                                 "construction of hIPPYlib model.")
+                raise ValueError(
+                    "Need to initialize PDE problem, prior and misfit functional for "
+                    "construction of hIPPYlib model."
+                )
         return self._inferenceModel
 
     @property
@@ -748,7 +839,7 @@ class SDEInferenceModel:
             raise ValueError("Property has not been initialized.")
         return self._grPosterior
 
-    #-----------------------------------------------------------------------------------------------
+    # -----------------------------------------------------------------------------------------------
     @isStationary.setter
     def isStationary(self, isStationary: bool) -> None:
         if not isinstance(isStationary, bool):
@@ -768,7 +859,9 @@ class SDEInferenceModel:
         self._simTimes = simTimes
 
     @funcSpaces.setter
-    def funcSpaces(self, funcSpaces: list[Union[fe.FunctionSpace, fe.VectorFunctionSpace]]) -> None:
+    def funcSpaces(
+        self, funcSpaces: list[Union[fe.FunctionSpace, fe.VectorFunctionSpace]]
+    ) -> None:
         if not isinstance(funcSpaces, list):
             raise TypeError("Input does not have valid data type 'list'.")
         self._funcSpaces = funcSpaces
@@ -776,10 +869,12 @@ class SDEInferenceModel:
     @prior.setter
     def prior(self, prior: hl.modeling.prior.SqrtPrecisionPDE_Prior) -> None:
         if not isinstance(prior, hl.modeling.prior.SqrtPrecisionPDE_Prior):
-            raise TypeError("Input does not have valid data type "
-                            "'modeling.prior.SqrtPrecisionPDE_Prior'.")
+            raise TypeError(
+                "Input does not have valid data type "
+                "'modeling.prior.SqrtPrecisionPDE_Prior'."
+            )
         self._prior = prior
-    
+
     @pdeProblem.setter
     def pdeProblem(self, pdeProblem: hl.PDEProblem) -> None:
         if not isinstance(pdeProblem, hl.PDEProblem):
@@ -787,7 +882,7 @@ class SDEInferenceModel:
         self._pdeProblem = pdeProblem
 
     @misfitFunctional.setter
-    def misfitFunctional(self, misfitFunctional: hl.Misfit) ->  None:
+    def misfitFunctional(self, misfitFunctional: hl.Misfit) -> None:
         if not isinstance(misfitFunctional, hl.Misfit):
             raise TypeError("Input does not have valid data type 'hl.Misfit'")
         self._misfitFunctional = misfitFunctional
@@ -801,5 +896,7 @@ class SDEInferenceModel:
     @grPosterior.setter
     def grPosterior(self, grPosterior: hl.GaussianLRPosterior) -> None:
         if not isinstance(grPosterior, hl.GaussianLRPosterior):
-            raise TypeError("Input does not have valid data type 'hl.GaussianLRPosterior'")
+            raise TypeError(
+                "Input does not have valid data type 'hl.GaussianLRPosterior'"
+            )
         self._grPosterior = grPosterior

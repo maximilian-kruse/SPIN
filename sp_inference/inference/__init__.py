@@ -8,7 +8,7 @@ Modules:
 
 1) model:
 ---------
-Wrapper for a problem setup in the hIPPYlib library that is tailored to the inference of drift 
+Wrapper for a problem setup in the hIPPYlib library that is tailored to the inference of drift
 and/or diffusion functions of stochastic processes.
 
 2) sampling:

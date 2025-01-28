@@ -1,7 +1,7 @@
 """Initialization file for the SP inference package
 
-This is the top-level initialization of the SP inference package. The package comprises three 
-sub-packages, as well as two stand-alone modules. For more detailed information, please refer to 
+This is the top-level initialization of the SP inference package. The package comprises three
+sub-packages, as well as two stand-alone modules. For more detailed information, please refer to
 the respective sub-packages and modules.
 
 Sub-Packages:

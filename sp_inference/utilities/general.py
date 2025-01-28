@@ -1,7 +1,7 @@
 """General utilities module
 
 This module contains a collection of supplementary functions. These functions mainly deal with the
-conversion between FEniCS/hIPPYlib and python/numpy data types. Further capabilities include a 
+conversion between FEniCS/hIPPYlib and python/numpy data types. Further capabilities include a
 checking routine for settings dictionaries and the conversion of numerical data into a uniform
 format.
 
@@ -19,7 +19,7 @@ process_input_data: Processes numeric input data into uniform numpy format
 process_output_data: Processes numeric output data into uniform format
 """
 
-#====================================== Preliminary Commands =======================================
+# ====================================== Preliminary Commands =======================================
 import warnings
 import numpy as np
 from typing import Any, Callable, Optional, Union
@@ -30,9 +30,10 @@ with warnings.catch_warnings():
     import hippylib as hl
 
 
-#======================================== Utility Functions ========================================
+# ======================================== Utility Functions ========================================
 
-#---------------------------------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------------------------------
 def nparray_to_fevec(array: np.ndarray) -> fe.GenericVector:
     """Converts a numpy array into a FEniCS vector
 
@@ -58,10 +59,11 @@ def nparray_to_fevec(array: np.ndarray) -> fe.GenericVector:
 
     return feVec
 
-#---------------------------------------------------------------------------------------------------
-def nparray_to_fefunc(array: np.ndarray, 
-                      funcSpace: Union[fe.FunctionSpace, fe.VectorFunctionSpace])\
-                      -> fe.Function:
+
+# ---------------------------------------------------------------------------------------------------
+def nparray_to_fefunc(
+    array: np.ndarray, funcSpace: Union[fe.FunctionSpace, fe.VectorFunctionSpace]
+) -> fe.Function:
     """Converts a numpy array into a FEniCS function
 
     This procedure requires the conversion to a FEniCS vector (see above) and a subsequent call to
@@ -80,8 +82,11 @@ def nparray_to_fefunc(array: np.ndarray,
 
     return feFunc
 
-#---------------------------------------------------------------------------------------------------
-def nparray_to_tdv(timePoints: np.ndarray, tdArray: np.ndarray) -> hl.TimeDependentVector:
+
+# ---------------------------------------------------------------------------------------------------
+def nparray_to_tdv(
+    timePoints: np.ndarray, tdArray: np.ndarray
+) -> hl.TimeDependentVector:
     """Converts a numpy array into a hIPPYlib time-dependent vector
 
     The provided data array needs to be two-dimensional, whereas the first dimension corresponds
@@ -102,8 +107,10 @@ def nparray_to_tdv(timePoints: np.ndarray, tdArray: np.ndarray) -> hl.TimeDepend
 
     if not all(isinstance(array, np.ndarray) for array in [timePoints, tdArray]):
         raise TypeError("Function inputs need to be numpy arrays.")
-    if not ((timePoints.shape[0] == tdArray.shape[0]) 
-         or (timePoints.ndim == tdArray.ndim == 1)):
+    if not (
+        (timePoints.shape[0] == tdArray.shape[0])
+        or (timePoints.ndim == tdArray.ndim == 1)
+    ):
         raise ValueError("Time points and value array do not match in first dimension.")
     if not len(tdArray.shape) in (1, 2):
         raise ValueError("This function only supports 1D space variables")
@@ -119,7 +126,8 @@ def nparray_to_tdv(timePoints: np.ndarray, tdArray: np.ndarray) -> hl.TimeDepend
 
     return tdVec
 
-#---------------------------------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------------------------------
 def tdv_to_nparray(tdVec: hl.TimeDependentVector) -> np.ndarray:
     """Converts a hIPPYlib time-dependent vector into a numpy array
 
@@ -148,10 +156,12 @@ def tdv_to_nparray(tdVec: hl.TimeDependentVector) -> np.ndarray:
 
     return tdArray
 
-#---------------------------------------------------------------------------------------------------
-def pyfunc_to_fevec(pyFuncHandle: Union[Callable, list[Callable]], 
-                    funcSpace: Union[fe.FunctionSpace, fe.VectorFunctionSpace, 
-                    fe.TensorFunctionSpace]) -> fe.GenericVector:
+
+# ---------------------------------------------------------------------------------------------------
+def pyfunc_to_fevec(
+    pyFuncHandle: Union[Callable, list[Callable]],
+    funcSpace: Union[fe.FunctionSpace, fe.VectorFunctionSpace, fe.TensorFunctionSpace],
+) -> fe.GenericVector:
     """Converts a python callable or list of callables into a FEniCS vector
 
     The callable(s) need to be vectorized, such that it can be evaluated over the degrees of freedom
@@ -175,12 +185,16 @@ def pyfunc_to_fevec(pyFuncHandle: Union[Callable, list[Callable]],
 
     if numSubSpaces in [0, 1]:
         if not callable(pyFuncHandle):
-            raise TypeError("Need callable python object for function space" 
-                            " of dimension zero or one.")
+            raise TypeError(
+                "Need callable python object for function space"
+                " of dimension zero or one."
+            )
         feVec = _pyfunc_to_fevec(pyFuncHandle, funcSpace)
     else:
         if not isinstance(pyFuncHandle, list) and len(list) == numSubSpaces:
-            raise TypeError("Need list of callables matching the number of FE subspaces.")
+            raise TypeError(
+                "Need list of callables matching the number of FE subspaces."
+            )
 
         subFuncs = []
         for i in range(numSubSpaces):
@@ -195,10 +209,12 @@ def pyfunc_to_fevec(pyFuncHandle: Union[Callable, list[Callable]],
     assert isinstance(feVec, fe.GenericVector), "Output is not a proper FEniCS vector."
     return feVec
 
-#---------------------------------------------------------------------------------------------------
-def pyfunc_to_fefunc(pyFuncHandle: Union[Callable, list[Callable]],
-                     funcSpace: Union[fe.FunctionSpace, fe.VectorFunctionSpace, fe.TensorFunctionSpace])\
-                     -> fe.Function:
+
+# ---------------------------------------------------------------------------------------------------
+def pyfunc_to_fefunc(
+    pyFuncHandle: Union[Callable, list[Callable]],
+    funcSpace: Union[fe.FunctionSpace, fe.VectorFunctionSpace, fe.TensorFunctionSpace],
+) -> fe.Function:
     """Converts a python callable or list of callables into a FEniCS function
 
     Args:
@@ -214,9 +230,10 @@ def pyfunc_to_fefunc(pyFuncHandle: Union[Callable, list[Callable]],
     feFunc = hl.vector2Function(feVec, funcSpace)
 
     assert isinstance(feFunc, fe.Function), "Output is not a proper FEniCS function."
-    return feFunc    
+    return feFunc
 
-#---------------------------------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------------------------------
 def reshape_to_np_format(flatArray: np.ndarray, numComponents: int) -> np.ndarray:
     """Reshapes array from FEniCS vector into form suitable for multiple variables
 
@@ -249,21 +266,22 @@ def reshape_to_np_format(flatArray: np.ndarray, numComponents: int) -> np.ndarra
 
     return structuredArray
 
-#---------------------------------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------------------------------
 def reshape_to_fe_format(structuredArray: np.ndarray) -> np.ndarray:
     if not isinstance(structuredArray, np.ndarray):
         raise TypeError("Input needs to be numpy array.")
-    
+
     numDims = structuredArray.ndim
     if numDims > 2:
         raise ValueError("Input array can at most be 2D")
     if numDims == 1:
         return structuredArray
-    
+
     numComponents = structuredArray.shape[1]
     if numComponents == 1:
         return structuredArray.flatten()
-    
+
     flatArray = np.zeros(structuredArray.size)
 
     for i in range(structuredArray.ndim):
@@ -271,7 +289,8 @@ def reshape_to_fe_format(structuredArray: np.ndarray) -> np.ndarray:
 
     return flatArray
 
-#---------------------------------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------------------------------
 def check_settings_dict(dictToTest: dict[str, Any], checkDict: dict[str, Any]) -> None:
     """Checks settings dictionary against prototype
 
@@ -290,8 +309,9 @@ def check_settings_dict(dictToTest: dict[str, Any], checkDict: dict[str, Any]) -
         ValueError: Checks if entries are within prescribed bounds
     """
 
-    assert isinstance (dictToTest, dict) and isinstance (checkDict, dict), \
-           "Comparison objects need to be dictionaries."
+    assert isinstance(dictToTest, dict) and isinstance(checkDict, dict), (
+        "Comparison objects need to be dictionaries."
+    )
 
     for checkKey in checkDict.keys():
         if not checkKey in dictToTest.keys():
@@ -300,19 +320,25 @@ def check_settings_dict(dictToTest: dict[str, Any], checkDict: dict[str, Any]) -
             raise KeyError(f"Necessary key '{checkKey}' not found.")
 
         if not isinstance(dictToTest[checkKey], checkDict[checkKey][0]):
-            raise TypeError(f"Entry for key '{checkKey}' has type {type(dictToTest[checkKey])},"
-                            f"but needs to have type {checkDict[checkKey][0]}.")
+            raise TypeError(
+                f"Entry for key '{checkKey}' has type {type(dictToTest[checkKey])},"
+                f"but needs to have type {checkDict[checkKey][0]}."
+            )
 
         if checkDict[checkKey][1] is not None:
             lowerLimit = checkDict[checkKey][1][0]
             upperLimit = checkDict[checkKey][1][1]
             if not (lowerLimit <= dictToTest[checkKey] <= upperLimit):
-                raise ValueError(f"Dict entry '{checkKey}' is not within prescribed bounds"
-                                 f"[{lowerLimit},{upperLimit}].")
+                raise ValueError(
+                    f"Dict entry '{checkKey}' is not within prescribed bounds"
+                    f"[{lowerLimit},{upperLimit}]."
+                )
 
-#---------------------------------------------------------------------------------------------------
-def process_input_data(inputData: Union[int, float, np.ndarray],
-                       enforce1D: Optional[bool]=False)-> np.ndarray:
+
+# ---------------------------------------------------------------------------------------------------
+def process_input_data(
+    inputData: Union[int, float, np.ndarray], enforce1D: Optional[bool] = False
+) -> np.ndarray:
     """Converts input data into standard format (numpy array)
 
     Args:
@@ -329,7 +355,9 @@ def process_input_data(inputData: Union[int, float, np.ndarray],
     """
 
     if not isinstance(inputData, (int, float, np.ndarray)):
-        raise TypeError("Domain points need to be provided as int, float, or numpy array.")
+        raise TypeError(
+            "Domain points need to be provided as int, float, or numpy array."
+        )
     if not isinstance(inputData, np.ndarray):
         inputData = np.array(inputData, ndmin=1)
     if enforce1D and inputData.ndim > 1:
@@ -337,8 +365,9 @@ def process_input_data(inputData: Union[int, float, np.ndarray],
 
     return inputData
 
-#---------------------------------------------------------------------------------------------------
-def process_output_data(outputData: np.ndarray)-> Union[float, np.ndarray]:
+
+# ---------------------------------------------------------------------------------------------------
+def process_output_data(outputData: np.ndarray) -> Union[float, np.ndarray]:
     """Converts output data into most convenient output format
 
     Args:
@@ -352,16 +381,19 @@ def process_output_data(outputData: np.ndarray)-> Union[float, np.ndarray]:
 
     if isinstance(outputData, np.ndarray):
         pointArray = np.squeeze(outputData)
-    if hasattr(outputData, 'size'):
+    if hasattr(outputData, "size"):
         if outputData.size == 1:
-            pointArray = float(outputData) 
+            pointArray = float(outputData)
     elif not isinstance(outputData, (int, float)):
         raise AssertionError("Output needs to be number or numpy object.")
-        
+
     return pointArray
 
-#---------------------------------------------------------------------------------------------------
-def _pyfunc_to_fevec(pyFuncHandle: Callable, funcSpace: fe.FunctionSpace) -> fe.GenericVector:
+
+# ---------------------------------------------------------------------------------------------------
+def _pyfunc_to_fevec(
+    pyFuncHandle: Callable, funcSpace: fe.FunctionSpace
+) -> fe.GenericVector:
     """Converts python callable into FEniCS vector on scalar function space"""
 
     if not isinstance(funcSpace, fe.FunctionSpace):

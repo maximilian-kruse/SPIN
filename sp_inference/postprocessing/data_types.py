@@ -1,4 +1,4 @@
-#====================================== Preliminary Commands =======================================
+# ====================================== Preliminary Commands =======================================
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, final, ClassVar, Iterable, Optional, Union
@@ -7,12 +7,12 @@ from typing_extensions import Self
 import numpy as np
 
 
-#============================================= Domain ==============================================
+# ============================================= Domain ==============================================
 @dataclass
 class Domain(ABC):
     locations: Any
-    label: ClassVar[str]=None
-    compatibility_list: ClassVar[Iterable[str]]=None
+    label: ClassVar[str] = None
+    compatibility_list: ClassVar[Iterable[str]] = None
 
     @abstractmethod
     def __post_init__(self):
@@ -26,7 +26,8 @@ class Domain(ABC):
         is_compatible = domain.label in self.compatibility_list
         return is_compatible
 
-#---------------------------------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------------------------------
 @final
 @dataclass
 class Grid1D(Domain):
@@ -37,16 +38,18 @@ class Grid1D(Domain):
     def __post_init__(self):
         self.locations = np.squeeze(self.locations)
         if not self.locations.ndim == 1:
-            raise ValueError(f"Grid point array must be 1D, "
-                             f"but has dimension {self.locations.ndim}.")
-        
+            raise ValueError(
+                f"Grid point array must be 1D, but has dimension {self.locations.ndim}."
+            )
+
     def is_compatible_with_data(self, data: np.ndarray):
         has_matching_dim = data.ndim == 1
         has_matching_size = data.size == self.locations.size
         is_compatible = has_matching_dim and has_matching_size
         return is_compatible
-    
-#---------------------------------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------------------------------
 @final
 @dataclass
 class Grid2D(Domain):
@@ -60,8 +63,10 @@ class Grid2D(Domain):
         for i, vector in enumerate(self.locations):
             self.locations[i] = np.squeeze(vector)
         if not self.locations[i].ndim == 1:
-            raise ValueError(f"Grid point arrays must be 1D, "
-                             f"but array {i} has dimension {self.locations[i].ndim}.")
+            raise ValueError(
+                f"Grid point arrays must be 1D, "
+                f"but array {i} has dimension {self.locations[i].ndim}."
+            )
 
     def is_compatible_with_data(self, data: np.ndarray):
         has_matching_dim = data.ndim == 2
@@ -76,7 +81,7 @@ class Grid2D(Domain):
         return is_compatible
 
 
-#======================================== Field Components =========================================
+# ======================================== Field Components =========================================
 @dataclass
 class FieldComponent(ABC):
     domain: Domain
@@ -94,12 +99,13 @@ class FieldComponent(ABC):
         component_list = [cls(domain, values) for values in value_list]
         return component_list
 
-#---------------------------------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------------------------------
 @final
 @dataclass
 class StationaryFieldComponent(FieldComponent):
     values: np.ndarray
-    
+
     def __post_init__(self):
         self.values = np.squeeze(self.values)
         self.domain.is_compatible_with_data(self.values)
@@ -108,7 +114,8 @@ class StationaryFieldComponent(FieldComponent):
         is_compatible = self.domain.is_compatible_with_domain(other.domain)
         return is_compatible
 
-#---------------------------------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------------------------------
 @final
 @dataclass
 class TimeDependentFieldComponent(FieldComponent):
@@ -118,27 +125,34 @@ class TimeDependentFieldComponent(FieldComponent):
     def __post_init__(self):
         self.times = np.squeeze(self.times)
         if not self.times.ndim == 1:
-            raise ValueError(f"Time array must be 1D, but has dimension {self.times.ndim}.")
+            raise ValueError(
+                f"Time array must be 1D, but has dimension {self.times.ndim}."
+            )
         if not self.times.size == len(self.values):
-            raise ValueError(f"Number of time points ({self.times.size}) "
-                             f"does not match number of value arrays ({len(self.values)}).")
+            raise ValueError(
+                f"Number of time points ({self.times.size}) "
+                f"does not match number of value arrays ({len(self.values)})."
+            )
         if self.times.size < 3:
-            raise ValueError(f"Number of time points ({self.times.size}) "
-                             f"needs to be at least 3.")
+            raise ValueError(
+                f"Number of time points ({self.times.size}) needs to be at least 3."
+            )
 
         for i, value_array in enumerate(self.values):
             self.values[i] = np.squeeze(value_array)
             if not self.domain.is_compatible_with_data(self.values[i]):
-                raise ValueError(f"Values for time point {i} are not compatible with domain.")
+                raise ValueError(
+                    f"Values for time point {i} are not compatible with domain."
+                )
 
     def is_compatible(self, other: Self):
         domains_compatible = self.domain.is_compatible_with_domain(other.domain)
         times_compatible = self.times.size == other.times.size
         is_compatible = domains_compatible and times_compatible
         return is_compatible
-    
 
-#============================================= Fields ==============================================
+
+# ============================================= Fields ==============================================
 @dataclass
 class Field:
     components: Union[FieldComponent, Iterable[FieldComponent]]
@@ -161,11 +175,13 @@ class Field:
         is_compatible = compatible_components and compatible_component_num
         return is_compatible
 
-#---------------------------------------------------------------------------------------------------                       
+
+# ---------------------------------------------------------------------------------------------------
 @final
 @dataclass
 class StationaryField(Field):
     components: Iterable[StationaryFieldComponent]
+
 
 @final
 @dataclass
@@ -173,7 +189,7 @@ class TimeDependentField(Field):
     components: Iterable[TimeDependentFieldComponent]
 
 
-#========================================= Inference Data ==========================================
+# ========================================= Inference Data ==========================================
 @dataclass
 class InferenceData:
     label: str
