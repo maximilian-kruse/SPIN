@@ -21,7 +21,7 @@ def create_dolfin_function(
 
 # --------------------------------------------------------------------------------------------------
 def convert_to_numpy(
-    vector: dl.Vector | npt.NDArray[np.floating],
+    vector: dl.Vector | dl.PETScVector,
     num_components: Annotated[int, Is[lambda x: x > 0]],
 ) -> npt.NDArray[np.floating]:
     if isinstance(vector, dl.Vector):
@@ -29,6 +29,16 @@ def convert_to_numpy(
     components = [vector[i::num_components] for i in range(num_components)]
     numpy_array = np.stack(components, axis=0)
     return numpy_array
+
+
+# --------------------------------------------------------------------------------------------------
+def convert_to_dolfin(
+    array: npt.NDArray[np.floating], function_space: dl.FunctionSpace
+) -> dl.Function:
+    dolfin_function = dl.Function(function_space)
+    dolfin_function.vector().set_local(array.flatten())
+    dolfin_function.vector().apply("insert")
+    return dolfin_function
 
 
 # --------------------------------------------------------------------------------------------------

@@ -9,6 +9,8 @@ import dolfin as dl
 import numpy as np
 import numpy.typing as npt
 import ufl
+import ufl.argument
+import ufl.tensors
 from beartype.vale import Is
 
 import spin.fenics.converter as fex_converter
@@ -48,6 +50,23 @@ class SPINProblemSettings:
 
 
 # ==================================================================================================
+@dataclass
+class SPINProblem:
+    hippylib_variational_problem: hl.PDEProblem
+    num_variable_components: Annotated[int, Is[lambda x: x > 0]]
+    domain_dim: Annotated[int, Is[lambda x: x > 0]]
+    function_space_variables: dl.FunctionSpace
+    function_space_parameters: dl.FunctionSpace
+    function_space_drift: dl.FunctionSpace
+    function_space_diffusion: dl.FunctionSpace
+    coordinates_variables: npt.NDArray[np.floating]
+    coordinates_parameters: npt.NDArray[np.floating]
+    drift_array: npt.NDArray[np.floating] | None = None
+    log_squared_diffusion_array: npt.NDArray[np.floating] | None = None
+    initial_condition_array: npt.NDArray[np.floating] | None = None
+
+
+# ==================================================================================================
 class SPINProblemBuilder:
     # ----------------------------------------------------------------------------------------------
     def __init__(self, settings: SPINProblemSettings) -> None:
@@ -73,23 +92,52 @@ class SPINProblemBuilder:
         self._function_space_diffusion = None
         self._function_space_parameters = None
         self._function_space_composite = None
+        self._drift_function = None
+        self._log_squared_diffusion_function = None
+        self._initial_condition_function = None
         self._boundary_condition = None
         self._weak_form = None
         self._weak_form_wrapper = None
 
     # ----------------------------------------------------------------------------------------------
-    def build(self) -> hl.PDEProblem:
+    def build(self) -> SPINProblem:
         (
             self._function_space_variables,
             self._function_space_drift,
             self._function_space_diffusion,
             self._function_space_composite,
         ) = self._create_function_spaces()
+        (
+            self._drift_function,
+            self._log_squared_diffusion_function,
+            self._initial_condition_function,
+        ) = self._compile_expressions()
         self._function_space_parameters = self._assign_parameter_function_space()
         self._weak_form = self._assign_weak_form()
         self._boundary_condition = self._create_boundary_condition()
         self._weak_form_wrapper = self._create_weak_form_wrapper()
-        spin_problem = self._create_variational_problem()
+        variational_problem = self._create_variational_problem()
+
+        coordinates_variables = fex_converter.get_coordinates(self._function_space_variables)
+        coordinates_parameters = fex_converter.get_coordinates(self._function_space_drift)
+        drift_array, log_squared_diffusion_array, initial_condition_array = (
+            self._get_parameter_arrays()
+        )
+
+        spin_problem = SPINProblem(
+            hippylib_variational_problem=variational_problem,
+            num_variable_components=self._num_components,
+            domain_dim=self._domain_dim,
+            function_space_variables=self._function_space_variables,
+            function_space_parameters=self._function_space_parameters,
+            function_space_drift=self._function_space_drift,
+            function_space_diffusion=self._function_space_diffusion,
+            coordinates_variables=coordinates_variables,
+            coordinates_parameters=coordinates_parameters,
+            drift_array=drift_array,
+            log_squared_diffusion_array=log_squared_diffusion_array,
+            initial_condition_array=initial_condition_array,
+        )
         return spin_problem
 
     # ----------------------------------------------------------------------------------------------
@@ -137,6 +185,30 @@ class SPINProblemBuilder:
         )
 
     # ----------------------------------------------------------------------------------------------
+    def _compile_expressions(
+        self,
+    ) -> tuple[dl.Function | None, dl.Function | None, dl.Function | None]:
+        if self._drift is not None:
+            drift_function = fex_converter.create_dolfin_function(
+                self._drift, self._function_space_drift
+            )
+        else:
+            drift_function = None
+        if self._log_squared_diffusion is not None:
+            log_squared_diffusion_function = fex_converter.create_dolfin_function(
+                self._log_squared_diffusion, self._function_space_diffusion
+            )
+        else:
+            log_squared_diffusion_function = None
+        if self._initial_condition is not None:
+            initial_condition_function = fex_converter.create_dolfin_function(
+                self._initial_condition, self._function_space_variables
+            )
+        else:
+            initial_condition_function = None
+        return drift_function, log_squared_diffusion_function, initial_condition_function
+
+    # ----------------------------------------------------------------------------------------------
     def _assign_parameter_function_space(self) -> dl.FunctionSpace:
         if self._inference_type == "drift_only":
             parameter_function_space = self._function_space_drift
@@ -173,36 +245,42 @@ class SPINProblemBuilder:
         self,
     ) -> Callable[[Any, Any, Any], ufl.Form]:
         if self._inference_type == "drift_only":
-            if self._log_squared_diffusion is None:
+            if self._log_squared_diffusion_function is None:
                 raise ValueError("Diffusion function is required for drift only inference.")
-            loq_squared_diffusion_function = fex_converter.create_dolfin_function(
-                self._log_squared_diffusion, self._function_space_diffusion
-            )
 
-            def weak_form_wrapper(forward_variable, parameter_variable, adjoint_variable):
+            def weak_form_wrapper(
+                forward_variable: ufl.Argument,
+                parameter_variable: ufl.Coefficient,
+                adjoint_variable: ufl.Argument,
+            ) -> ufl.Form:
                 return self._weak_form(
                     forward_variable,
                     adjoint_variable,
                     parameter_variable,
-                    self._compute_matrix_exponential(loq_squared_diffusion_function),
+                    self._compute_matrix_exponential(self._log_squared_diffusion_function),
                 )
         elif self._inference_type == "diffusion_only":
             if self._drift is None:
                 raise ValueError("Drift function is required for diffusion only inference.")
-            drift_function = fex_converter.create_dolfin_function(
-                self._drift, self._function_space_drift
-            )
 
-            def weak_form_wrapper(forward_variable, parameter_variable, adjoint_variable):
+            def weak_form_wrapper(
+                forward_variable: ufl.Argument,
+                parameter_variable: ufl.Coefficient,
+                adjoint_variable: ufl.Argument,
+            ) -> ufl.Form:
                 return self._weak_form(
                     forward_variable,
                     adjoint_variable,
-                    drift_function,
+                    self._drift_function,
                     self._compute_matrix_exponential(parameter_variable),
                 )
         elif self._inference_type == "drift_and_diffusion":
 
-            def weak_form_wrapper(forward_variable, parameter_variable, adjoint_variable):
+            def weak_form_wrapper(
+                forward_variable: ufl.Argument,
+                parameter_variable: ufl.Coefficient,
+                adjoint_variable: ufl.Argument,
+            ) -> ufl.Form:
                 drift_variable = [parameter_variable[i] for i in range(self._domain_dim)]
                 log_squared_diffusion_variable = [
                     parameter_variable[i] for i in range(self._domain_dim, 2 * self._domain_dim)
@@ -263,10 +341,29 @@ class SPINProblemBuilder:
         return spin_problem
 
     # ----------------------------------------------------------------------------------------------
-    @property
-    def coordinates(
+    def _get_parameter_arrays(
         self,
-    ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating], npt.NDArray[np.floating]]:
-        coordinates_variables = fex_converter.get_coordinates(self._function_space_variables)
-        coordinates_parameters = fex_converter.get_coordinates(self._function_space_drift)
-        return coordinates_variables, coordinates_parameters
+    ) -> tuple[
+        npt.NDArray[np.floating] | None,
+        npt.NDArray[np.floating] | None,
+        tuple[npt.NDArray[np.floating]] | None,
+    ]:
+        if self._drift_function is not None:
+            drift_array = fex_converter.convert_to_numpy(
+                self._drift_function.vector(), self._domain_dim
+            )
+        else:
+            drift_array = None
+        if self._log_squared_diffusion_function is not None:
+            log_squared_diffusion_array = fex_converter.convert_to_numpy(
+                self._log_squared_diffusion_function.vector(), self._domain_dim
+            )
+        else:
+            log_squared_diffusion_array = None
+        if self._initial_condition_function is not None:
+            initial_condition_array = fex_converter.convert_to_numpy(
+                self._initial_condition_function.vector(), self._num_components
+            )
+        else:
+            initial_condition_array = None
+        return drift_array, log_squared_diffusion_array, initial_condition_array
