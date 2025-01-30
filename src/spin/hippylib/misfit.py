@@ -1,4 +1,5 @@
 from collections.abc import Iterable
+from dataclasses import dataclass
 from typing import Annotated
 
 import dolfin as dl
@@ -182,3 +183,35 @@ class VectorDiscreteMisfit(hl.Misfit):
 class TDMisfit(hl.Misfit):
     def __init__(stationary_misfits: Iterable[hl.Misfit]):
         pass
+
+
+# ==================================================================================================
+@dataclass
+class MisfitSettings:
+    observation_points: npt.NDArray[np.floating] | Iterable[npt.NDArray[np.floating]]
+    observation_values: npt.NDArray[np.floating] | Iterable[npt.NDArray[np.floating]]
+    noise_variance: npt.NDArray[np.floating] | Iterable[npt.NDArray[np.floating]]
+    function_space: dl.FunctionSpace
+
+    def __post_init__(self):
+        if self.function_space.num_sub_spaces() == 0 and not (
+            isinstance(self.observation_points, np.ndarray)
+            and isinstance(self.observation_values, np.ndarray)
+            and isinstance(self.noise_variance, np.ndarray)
+        ):
+            raise ValueError(
+                "The observation points, values, and noise variance must be "
+                "single arrays if the function space is scalar."
+            )
+        if self.function_space.num_sub_spaces() > 0 and not (
+            isinstance(self.observation_points, Iterable)
+            and isinstance(self.observation_values, Iterable)
+            and isinstance(self.noise_variance, Iterable)
+            and len(self.observation_points)
+            == len(self.observation_values)
+            == len(self.noise_variance)
+        ):
+            raise ValueError(
+                "The observation points, values, and noise variance must be "
+                "iterables if the function space has multiple components."
+            )

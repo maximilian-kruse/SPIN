@@ -50,5 +50,7 @@ def get_coordinates(
 ) -> npt.NDArray[np.floating]:
     num_components = function_space.num_sub_spaces()
     coordinates = function_space.tabulate_dof_coordinates()
-    coordinates = coordinates[0::num_components]
+    if num_components > 0:
+        component_dofs = function_space.sub(0).dofmap().dofs()
+        coordinates = coordinates[component_dofs]
     return coordinates
