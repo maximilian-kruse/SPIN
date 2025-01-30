@@ -77,12 +77,12 @@ class BilaplacianVectorPriorBuilder:
             self._cg_solver_relative_tolerance,
             self._cg_solver_max_iter,
         )
-        mean_array = fex_converter.convert_to_numpy(self._mean.vector(), self._num_components)
+        mean_array = fex_converter.convert_to_numpy(self._mean.vector(), self._function_space)
         variance_array = fex_converter.convert_to_numpy(
-            self._variance.vector(), self._num_components
+            self._variance.vector(), self._function_space
         )
         correlation_length_array = fex_converter.convert_to_numpy(
-            self._correlation_length.vector(), self._num_components
+            self._correlation_length.vector(), self._function_space
         )
         prior = Prior(
             hippylib_prior=prior_object,

@@ -350,19 +350,19 @@ class SPINProblemBuilder:
     ]:
         if self._drift_function is not None:
             drift_array = fex_converter.convert_to_numpy(
-                self._drift_function.vector(), self._domain_dim
+                self._drift_function.vector(), self._function_space_drift
             )
         else:
             drift_array = None
         if self._log_squared_diffusion_function is not None:
             log_squared_diffusion_array = fex_converter.convert_to_numpy(
-                self._log_squared_diffusion_function.vector(), self._domain_dim
+                self._log_squared_diffusion_function.vector(), self._function_space_diffusion
             )
         else:
             log_squared_diffusion_array = None
         if self._initial_condition_function is not None:
             initial_condition_array = fex_converter.convert_to_numpy(
-                self._initial_condition_function.vector(), self._num_components
+                self._initial_condition_function.vector(), self._function_space_variables
             )
         else:
             initial_condition_array = None

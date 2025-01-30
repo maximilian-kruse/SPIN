@@ -22,11 +22,14 @@ def create_dolfin_function(
 # --------------------------------------------------------------------------------------------------
 def convert_to_numpy(
     vector: dl.Vector | dl.PETScVector,
-    num_components: Annotated[int, Is[lambda x: x > 0]],
+    function_space: dl.FunctionSpace,
 ) -> npt.NDArray[np.floating]:
-    if isinstance(vector, dl.Vector):
-        vector = vector.get_local()
-    components = [vector[i::num_components] for i in range(num_components)]
+    vector = vector.get_local()
+    num_components = function_space.num_sub_spaces()
+    components = []
+    for i in range(num_components):
+        component_dofs = function_space.sub(i).dofmap().dofs()
+        components.append(vector[component_dofs])
     numpy_array = np.stack(components, axis=0)
     return numpy_array
 
