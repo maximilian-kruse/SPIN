@@ -1,13 +1,14 @@
 import dolfin as dl
 import ufl
 
+
 # ==================================================================================================
 def weak_form_mean_exit_time(
     forward_variable: ufl.Argument,
-    adjoint_variable: dl.Function,
-    drift: dl.Function,
-    squared_diffusion: dl.Function,
-) -> dl.Form:
+    adjoint_variable: ufl.Argument,
+    drift: ufl.Coefficient,
+    squared_diffusion: ufl.tensors.ListTensor,
+) -> ufl.Form:
     weak_form = (
         dl.dot(drift * adjoint_variable, dl.grad(forward_variable)) * dl.dx
         - 0.5
@@ -20,11 +21,11 @@ def weak_form_mean_exit_time(
 
 # --------------------------------------------------------------------------------------------------
 def weak_form_mean_exit_time_moments(
-    forward_variable: dl.Function,
-    adjoint_variable: dl.Function,
-    drift: dl.Function,
-    squared_diffusion: dl.Function,
-) -> dl.Form:
+    forward_variable: ufl.Argument,
+    adjoint_variable: ufl.Argument,
+    drift: ufl.Coefficient,
+    squared_diffusion: ufl.tensors.ListTensor,
+) -> ufl.Form:
     weak_form_component_1 = (
         dl.dot(drift * adjoint_variable[0], dl.grad(forward_variable[0])) * dl.dx
         - 0.5
@@ -45,11 +46,11 @@ def weak_form_mean_exit_time_moments(
 
 # --------------------------------------------------------------------------------------------------
 def weak_form_fokker_planck(
-    forward_variable: dl.Function,
-    adjoint_variable: dl.Function,
-    drift: dl.Function,
-    squared_diffusion: dl.Function,
-) -> dl.Form:
+    forward_variable: ufl.Argument,
+    adjoint_variable: ufl.Argument,
+    drift: ufl.Coefficient,
+    squared_diffusion: ufl.tensors.ListTensor,
+) -> ufl.Form:
     weak_form = (
         dl.div(drift * forward_variable) * adjoint_variable * dl.dx
         + 0.5

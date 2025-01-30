@@ -3,9 +3,11 @@ import warnings
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from numbers import Real
-from typing import Annotated
+from typing import Annotated, Any
 
 import dolfin as dl
+import numpy as np
+import numpy.typing as npt
 import ufl
 from beartype.vale import Is
 
@@ -38,7 +40,7 @@ class SPINProblemSettings:
     element_degree_variables: Annotated[int, Is[lambda x: x > 0]] = 1
     element_degree_parameters: Annotated[int, Is[lambda x: x > 0]] = 1
     drift: str | Iterable[str] | None = None
-    squared_diffusion: str | Iterable[Iterable[str]] | None = None
+    log_squared_diffusion: str | Iterable[str] | None = None
     start_time: Real | None = None
     end_time: Real | None = None
     num_steps: int | None = None
@@ -57,7 +59,7 @@ class SPINProblemBuilder:
         self._element_degree_variables = settings.element_degree_variables
         self._element_degree_parameters = settings.element_degree_parameters
         self._drift = settings.drift
-        self._squared_diffusion = settings.squared_diffusion
+        self._log_squared_diffusion = settings.log_squared_diffusion
         self._start_time = settings.start_time
         self._end_time = settings.end_time
         self._num_steps = settings.num_steps
@@ -67,9 +69,9 @@ class SPINProblemBuilder:
         self._num_components = 2 if self._pde_type == "mean_exit_time_moments" else 1
 
         self._function_space_variables = None
-        self._function_space_parameters = None
         self._function_space_drift = None
         self._function_space_diffusion = None
+        self._function_space_parameters = None
         self._function_space_composite = None
         self._boundary_condition = None
         self._weak_form = None
@@ -94,7 +96,7 @@ class SPINProblemBuilder:
     def _create_function_spaces(
         self,
     ) -> tuple[dl.FunctionSpace, dl.FunctionSpace, dl.FunctionSpace, dl.FunctionSpace]:
-        if self._num_components ==1:
+        if self._num_components == 1:
             VariableElement = dl.FiniteElement  # noqa: N806
         else:
             VariableElement = functools.partial(dl.VectorElement, dim=self._num_components)  # noqa: N806
@@ -110,12 +112,11 @@ class SPINProblemBuilder:
             degree=self._element_degree_parameters,
             dim=self._domain_dim,
         )
-        elem_diffusion = dl.TensorElement(
+        elem_diffusion = dl.VectorElement(
             family=self._element_family_parameters,
             cell=self._mesh.ufl_cell(),
             degree=self._element_degree_parameters,
-            shape=(self._domain_dim, self._domain_dim),
-            symmetry=True,
+            dim=self._domain_dim,
         )
         elem_composite = dl.MixedElement([elem_drift, elem_diffusion])
         function_space_variables = dl.FunctionSpace(self._mesh, elem_variables)
@@ -165,16 +166,19 @@ class SPINProblemBuilder:
     # ----------------------------------------------------------------------------------------------
     def _create_weak_form_wrapper(
         self,
-    ) -> Callable[[dl.Function, dl.Function, dl.Function], dl.Form]:
+    ) -> Callable[[Any, Any, Any], ufl.Form]:
         if self._inference_type == "drift_only":
-            if self._squared_diffusion is None:
+            if self._log_squared_diffusion is None:
                 raise ValueError("Diffusion function is required for drift only inference.")
             diffusion_function = fex_converter.create_dolfin_function(
-                self._squared_diffusion, self._function_space_diffusion
+                self._log_squared_diffusion, self._function_space_diffusion
             )
             weak_form_wrapper = (  # noqa: E731
                 lambda forward_variable, parameter_variable, adjoint_variable: self._weak_form(
-                    forward_variable, adjoint_variable, parameter_variable, diffusion_function
+                    forward_variable,
+                    adjoint_variable,
+                    parameter_variable,
+                    self._compute_matrix_exponential(diffusion_function),
                 )
             )
         elif self._inference_type == "diffusion_only":
@@ -185,16 +189,43 @@ class SPINProblemBuilder:
             )
             weak_form_wrapper = (  # noqa: E731
                 lambda forward_variable, parameter_variable, adjoint_variable: self._weak_form(
-                    forward_variable, adjoint_variable, drift_function, parameter_variable
+                    forward_variable,
+                    adjoint_variable,
+                    drift_function,
+                    self._compute_matrix_exponential(parameter_variable),
                 )
             )
         elif self._inference_type == "drift_and_diffusion":
             weak_form_wrapper = (  # noqa: E731
                 lambda forward_variable, parameter_variable, adjoint_variable: self._weak_form(
-                    forward_variable, adjoint_variable, parameter_variable[0], parameter_variable[1]
+                    forward_variable,
+                    adjoint_variable,
+                    parameter_variable[0],
+                    self._compute_matrix_exponential(parameter_variable[1]),
                 )
             )
         return weak_form_wrapper
+
+    # ----------------------------------------------------------------------------------------------
+    def _compute_matrix_exponential[matrixtype](self, matrix_diagonal: matrixtype) -> matrixtype:
+        if self._domain_dim == 1:
+            matrix_exponential = ufl.as_matrix(((ufl.exp(matrix_diagonal[0]),),))
+        elif self._domain_dim == 2:
+            matrix_exponential = ufl.as_matrix(
+                (
+                    (ufl.exp(matrix_diagonal[0]), 0),
+                    (0, ufl.exp(matrix_diagonal[1])),
+                )
+            )
+        elif self._domain_dim == 3:
+            matrix_exponential = ufl.as_matrix(
+                (
+                    (ufl.exp(matrix_diagonal[0]), 0, 0),
+                    (0, ufl.exp(matrix_diagonal[1]), 0),
+                    (0, 0, ufl.exp(matrix_diagonal[2])),
+                )
+            )
+        return matrix_exponential
 
     # ----------------------------------------------------------------------------------------------
     def _create_variational_problem(self) -> hl.PDEProblem:
@@ -230,3 +261,13 @@ class SPINProblemBuilder:
                 is_fwd_linear=True,
             )
         return spin_problem
+
+    # ----------------------------------------------------------------------------------------------
+    @property
+    def coordinates(
+        self,
+    ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating], npt.NDArray[np.floating]]:
+        coordinates_variables = self._function_space_variables.tabulate_dof_coordinates()
+        coordinates_drift = self._function_space_drift.tabulate_dof_coordinates()
+        coordinates_diffusion = self._function_space_diffusion.tabulate_dof_coordinates()
+        return coordinates_variables, coordinates_drift, coordinates_diffusion
