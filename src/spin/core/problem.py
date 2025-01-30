@@ -118,7 +118,12 @@ class SPINProblemBuilder:
             degree=self._element_degree_parameters,
             dim=self._domain_dim,
         )
-        elem_composite = dl.MixedElement([elem_drift, elem_diffusion])
+        elem_composite = dl.VectorElement(
+            family=self._element_family_parameters,
+            cell=self._mesh.ufl_cell(),
+            degree=self._element_degree_parameters,
+            dim=2 * self._domain_dim,
+        )
         function_space_variables = dl.FunctionSpace(self._mesh, elem_variables)
         function_space_drift = dl.FunctionSpace(self._mesh, elem_drift)
         function_space_diffusion = dl.FunctionSpace(self._mesh, elem_diffusion)
@@ -144,7 +149,7 @@ class SPINProblemBuilder:
     # ----------------------------------------------------------------------------------------------
     def _assign_weak_form(
         self,
-    ) -> Callable[[dl.Function, dl.Function, dl.Function, dl.Function], dl.Form]:
+    ) -> Callable[[ufl.Argument, ufl.Argument, ufl.Coefficient, ufl.tensors.ListTensor], dl.Form]:
         if self._pde_type == "mean_exit_time":
             weak_form = weakforms.weak_form_mean_exit_time
         elif self._pde_type == "mean_exit_time_moments":
@@ -170,61 +175,56 @@ class SPINProblemBuilder:
         if self._inference_type == "drift_only":
             if self._log_squared_diffusion is None:
                 raise ValueError("Diffusion function is required for drift only inference.")
-            diffusion_function = fex_converter.create_dolfin_function(
+            loq_squared_diffusion_function = fex_converter.create_dolfin_function(
                 self._log_squared_diffusion, self._function_space_diffusion
             )
-            weak_form_wrapper = (  # noqa: E731
-                lambda forward_variable, parameter_variable, adjoint_variable: self._weak_form(
+
+            def weak_form_wrapper(forward_variable, parameter_variable, adjoint_variable):
+                return self._weak_form(
                     forward_variable,
                     adjoint_variable,
                     parameter_variable,
-                    self._compute_matrix_exponential(diffusion_function),
+                    self._compute_matrix_exponential(loq_squared_diffusion_function),
                 )
-            )
         elif self._inference_type == "diffusion_only":
             if self._drift is None:
                 raise ValueError("Drift function is required for diffusion only inference.")
             drift_function = fex_converter.create_dolfin_function(
                 self._drift, self._function_space_drift
             )
-            weak_form_wrapper = (  # noqa: E731
-                lambda forward_variable, parameter_variable, adjoint_variable: self._weak_form(
+
+            def weak_form_wrapper(forward_variable, parameter_variable, adjoint_variable):
+                return self._weak_form(
                     forward_variable,
                     adjoint_variable,
                     drift_function,
                     self._compute_matrix_exponential(parameter_variable),
                 )
-            )
         elif self._inference_type == "drift_and_diffusion":
-            weak_form_wrapper = (  # noqa: E731
-                lambda forward_variable, parameter_variable, adjoint_variable: self._weak_form(
+
+            def weak_form_wrapper(forward_variable, parameter_variable, adjoint_variable):
+                drift_variable = [parameter_variable[i] for i in range(self._domain_dim)]
+                log_squared_diffusion_variable = [
+                    parameter_variable[i] for i in range(self._domain_dim, 2 * self._domain_dim)
+                ]
+                drift_variable = ufl.as_vector(drift_variable)
+                log_squared_diffusion_variable = ufl.as_vector(log_squared_diffusion_variable)
+                return self._weak_form(
                     forward_variable,
                     adjoint_variable,
-                    parameter_variable[0],
-                    self._compute_matrix_exponential(parameter_variable[1]),
+                    drift_variable,
+                    self._compute_matrix_exponential(log_squared_diffusion_variable),
                 )
-            )
+
         return weak_form_wrapper
 
     # ----------------------------------------------------------------------------------------------
-    def _compute_matrix_exponential[matrixtype](self, matrix_diagonal: matrixtype) -> matrixtype:
-        if self._domain_dim == 1:
-            matrix_exponential = ufl.as_matrix(((ufl.exp(matrix_diagonal[0]),),))
-        elif self._domain_dim == 2:
-            matrix_exponential = ufl.as_matrix(
-                (
-                    (ufl.exp(matrix_diagonal[0]), 0),
-                    (0, ufl.exp(matrix_diagonal[1])),
-                )
-            )
-        elif self._domain_dim == 3:
-            matrix_exponential = ufl.as_matrix(
-                (
-                    (ufl.exp(matrix_diagonal[0]), 0, 0),
-                    (0, ufl.exp(matrix_diagonal[1]), 0),
-                    (0, 0, ufl.exp(matrix_diagonal[2])),
-                )
-            )
+    def _compute_matrix_exponential(
+        self, matrix_diagonal: dl.Function | ufl.tensors.ListTensor
+    ) -> ufl.tensors.ListTensor:
+        diagonal_components = [ufl.exp(component) for component in matrix_diagonal]
+        diagonal_components = ufl.as_vector(diagonal_components)
+        matrix_exponential = ufl.diag(diagonal_components)
         return matrix_exponential
 
     # ----------------------------------------------------------------------------------------------
@@ -267,7 +267,6 @@ class SPINProblemBuilder:
     def coordinates(
         self,
     ) -> tuple[npt.NDArray[np.floating], npt.NDArray[np.floating], npt.NDArray[np.floating]]:
-        coordinates_variables = self._function_space_variables.tabulate_dof_coordinates()
-        coordinates_drift = self._function_space_drift.tabulate_dof_coordinates()
-        coordinates_diffusion = self._function_space_diffusion.tabulate_dof_coordinates()
-        return coordinates_variables, coordinates_drift, coordinates_diffusion
+        coordinates_variables = fex_converter.get_coordinates(self._function_space_variables)
+        coordinates_parameters = fex_converter.get_coordinates(self._function_space_drift)
+        return coordinates_variables, coordinates_parameters

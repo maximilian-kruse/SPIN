@@ -6,7 +6,7 @@ import ufl
 def weak_form_mean_exit_time(
     forward_variable: ufl.Argument,
     adjoint_variable: ufl.Argument,
-    drift: ufl.Coefficient,
+    drift: ufl.Coefficient | ufl.tensors.ListTensor,
     squared_diffusion: ufl.tensors.ListTensor,
 ) -> ufl.Form:
     weak_form = (
@@ -23,7 +23,7 @@ def weak_form_mean_exit_time(
 def weak_form_mean_exit_time_moments(
     forward_variable: ufl.Argument,
     adjoint_variable: ufl.Argument,
-    drift: ufl.Coefficient,
+    drift: ufl.Coefficient | ufl.tensors.ListTensor,
     squared_diffusion: ufl.tensors.ListTensor,
 ) -> ufl.Form:
     weak_form_component_1 = (
@@ -48,7 +48,7 @@ def weak_form_mean_exit_time_moments(
 def weak_form_fokker_planck(
     forward_variable: ufl.Argument,
     adjoint_variable: ufl.Argument,
-    drift: ufl.Coefficient,
+    drift: ufl.Coefficient | ufl.tensors.ListTensor,
     squared_diffusion: ufl.tensors.ListTensor,
 ) -> ufl.Form:
     weak_form = (

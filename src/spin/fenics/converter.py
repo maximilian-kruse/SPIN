@@ -34,7 +34,7 @@ def convert_to_numpy(
 # --------------------------------------------------------------------------------------------------
 def get_coordinates(
     function_space: dl.FunctionSpace,
-) -> np.array:
+) -> npt.NDArray[np.floating]:
     num_components = function_space.num_sub_spaces()
     coordinates = function_space.tabulate_dof_coordinates()
     coordinates = coordinates[0::num_components]
