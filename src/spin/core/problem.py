@@ -177,7 +177,7 @@ class SPINProblemBuilder:
         if self._pde_type.num_components == 1:
             VariableElement = dl.FiniteElement  # noqa: N806
         else:
-            VariableElement = functools.partial(dl.VectorElement, dim=self._pde_type_num_components)  # noqa: N806
+            VariableElement = functools.partial(dl.VectorElement, dim=self._pde_type.num_components)  # noqa: N806
 
         elem_variables = VariableElement(
             family=self._element_family_variables,
