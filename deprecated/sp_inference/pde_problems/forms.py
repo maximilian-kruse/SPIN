@@ -64,9 +64,7 @@ class FokkerPlanckFormHandler(VariationalFormHandler):
 
         weakForm = (
             fe.div(driftParam * forwardVar) * adjointVar * fe.dx
-            + 0.5
-            * fe.dot(fe.div(squaredDiffusionParam * forwardVar), fe.grad(adjointVar))
-            * fe.dx
+            + 0.5 * fe.dot(fe.div(squaredDiffusionParam * forwardVar), fe.grad(adjointVar)) * fe.dx
             + fe.Constant(0) * adjointVar * fe.dx
         )
 
@@ -89,9 +87,7 @@ class MeanExitTimeFormHandler(VariationalFormHandler):
 
         weakForm = (
             fe.dot(driftParam * adjointVar, fe.grad(forwardVar)) * fe.dx
-            - 0.5
-            * fe.dot(fe.div(squaredDiffusionParam * adjointVar), fe.grad(forwardVar))
-            * fe.dx
+            - 0.5 * fe.dot(fe.div(squaredDiffusionParam * adjointVar), fe.grad(forwardVar)) * fe.dx
             + fe.Constant(1) * adjointVar * fe.dx
         )
 
@@ -115,18 +111,14 @@ class MeanExitTimeMomentsFormHandler(VariationalFormHandler):
         weak_form_1 = (
             fe.dot(driftParam * adjointVar[0], fe.grad(forwardVar[0])) * fe.dx
             - 0.5
-            * fe.dot(
-                fe.div(squaredDiffusionParam * adjointVar[0]), fe.grad(forwardVar[0])
-            )
+            * fe.dot(fe.div(squaredDiffusionParam * adjointVar[0]), fe.grad(forwardVar[0]))
             * fe.dx
             + fe.Constant(1) * adjointVar[0] * fe.dx
         )
         weak_form_2 = (
             fe.dot(driftParam * adjointVar[1], fe.grad(forwardVar[1])) * fe.dx
             - 0.5
-            * fe.dot(
-                fe.div(squaredDiffusionParam * adjointVar[1]), fe.grad(forwardVar[1])
-            )
+            * fe.dot(fe.div(squaredDiffusionParam * adjointVar[1]), fe.grad(forwardVar[1]))
             * fe.dx
             + 2 * forwardVar[0] * adjointVar[1] * fe.dx
         )

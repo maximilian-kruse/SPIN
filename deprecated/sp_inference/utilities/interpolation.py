@@ -60,19 +60,14 @@ class InterpolationHandle:
         """
 
         if not all(
-            isinstance(timeStruct, (int, float, np.ndarray))
-            for timeStruct in [obsTimes, simTimes]
+            isinstance(timeStruct, (int, float, np.ndarray)) for timeStruct in [obsTimes, simTimes]
         ):
-            raise TypeError(
-                "Time structures need to be given as numbers or numpy arrays."
-            )
+            raise TypeError("Time structures need to be given as numbers or numpy arrays.")
         if not simTimes.ndim > 0:
             raise ValueError("Simulation time array must contain more than one value")
         if not np.all(np.diff(simTimes) > 0):
             raise ValueError("Time arrays need to be sorted.")
-        if not np.all(
-            (obsTimes >= np.amin(simTimes)) & (obsTimes <= np.amax(simTimes))
-        ):
+        if not np.all((obsTimes >= np.amin(simTimes)) & (obsTimes <= np.amax(simTimes))):
             raise ValueError("Observation times need to lie within simulation times.")
         if not isinstance(funcSpace, fe.FunctionSpace):
             raise TypeError("Function Space needs to be valid FEniCS object.")
@@ -84,14 +79,10 @@ class InterpolationHandle:
         self._obsTimes = obsTimes
         self._obsTimeInds = np.indices((obsTimes.size,)).flatten()
         self._timeInterpData = self._assemble_interpolation_data()
-        self._projMat = hl.pointwiseObservation.assemblePointwiseObservation(
-            funcSpace, obsPoints
-        )
+        self._projMat = hl.pointwiseObservation.assemblePointwiseObservation(funcSpace, obsPoints)
 
     # -----------------------------------------------------------------------------------------------
-    def interpolate_in_time(
-        self, simVec: hl.TimeDependentVector
-    ) -> hl.TimeDependentVector:
+    def interpolate_in_time(self, simVec: hl.TimeDependentVector) -> hl.TimeDependentVector:
         """Interpolates linearly in time
 
         For every new data point, its values are determined via the previously assembled
@@ -128,9 +119,7 @@ class InterpolationHandle:
         return interpVec
 
     # -----------------------------------------------------------------------------------------------
-    def project_in_space(
-        self, interpVec: hl.TimeDependentVector
-    ) -> hl.TimeDependentVector:
+    def project_in_space(self, interpVec: hl.TimeDependentVector) -> hl.TimeDependentVector:
         """Projects FEM points to alternative locations in space
 
         The projection takes into account the definition of the FEM data w.r.t. to shape functions.
@@ -148,8 +137,7 @@ class InterpolationHandle:
 
         if not np.array_equal(self._obsTimes, interpVec.times):
             raise ValueError(
-                "Observation times and times for construction of space projection "
-                "need to be equal."
+                "Observation times and times for construction of space projection need to be equal."
             )
         projVec = hl.TimeDependentVector(self._obsTimes)
         projVec.initialize(self._projMat, 0)
@@ -160,9 +148,7 @@ class InterpolationHandle:
         return projVec
 
     # -----------------------------------------------------------------------------------------------
-    def interpolate_and_project(
-        self, simVec: hl.TimeDependentVector
-    ) -> hl.TimeDependentVector:
+    def interpolate_and_project(self, simVec: hl.TimeDependentVector) -> hl.TimeDependentVector:
         """Wrapper method for interpolation and projection
 
         Args:

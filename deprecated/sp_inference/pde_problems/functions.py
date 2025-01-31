@@ -71,9 +71,7 @@ def assemble_transient(
     """
 
     if not isinstance(funcSpace, fe.FunctionSpace):
-        raise TypeError(
-            "Need valid FEniCS function space for trial and test functions."
-        )
+        raise TypeError("Need valid FEniCS function space for trial and test functions.")
     if not (isinstance(timeStepSize, float) and timeStepSize > 0):
         raise TypeError("Time step size needs to be positive float.")
     if not isinstance(stationaryForm, ufl.form.Form):
@@ -132,9 +130,7 @@ def solve_transient(
     """
 
     if not isinstance(simInds, np.ndarray):
-        raise TypeError(
-            "Simulation time indices need to be provided as numpy array of ints."
-        )
+        raise TypeError("Simulation time indices need to be provided as numpy array of ints.")
     if not isinstance(solver, fe.cpp.la.GenericLinearSolver):
         raise TypeError("Routine requires initialized Linear solver.")
     utils.check_settings_dict(problemStructs, _checkDictProblem)

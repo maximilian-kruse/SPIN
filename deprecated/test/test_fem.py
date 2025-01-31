@@ -91,18 +91,14 @@ def transient_problem_setup(fem_space_setup: Tuple, fem_var_setup: Tuple) -> Tup
     forwardFunc, adjointFunc, driftFunc, diffusionFunc = fem_var_setup
     varFormFunc, _ = femForms.get_form("fokker_planck")
     varForm = varFormFunc(forwardFunc, driftFunc, diffusionFunc, adjointFunc)
-    bcList = [
-        fe.DirichletBC(funcSpace, fe.Constant(TestData.boundaryValue), on_boundary)
-    ]
+    bcList = [fe.DirichletBC(funcSpace, fe.Constant(TestData.boundaryValue), on_boundary)]
 
     return varForm, bcList
 
 
 # ---------------------------------------------------------------------------------------------------
 @pytest.fixture(scope="module")
-def transient_matrix_setup(
-    fem_var_setup: Tuple, transient_problem_setup: Tuple
-) -> Tuple:
+def transient_matrix_setup(fem_var_setup: Tuple, transient_problem_setup: Tuple) -> Tuple:
     forwardFunc, adjointFunc, *_ = fem_var_setup
     varForm, bcList = transient_problem_setup
 

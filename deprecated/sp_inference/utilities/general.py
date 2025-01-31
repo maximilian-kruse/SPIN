@@ -84,9 +84,7 @@ def nparray_to_fefunc(
 
 
 # ---------------------------------------------------------------------------------------------------
-def nparray_to_tdv(
-    timePoints: np.ndarray, tdArray: np.ndarray
-) -> hl.TimeDependentVector:
+def nparray_to_tdv(timePoints: np.ndarray, tdArray: np.ndarray) -> hl.TimeDependentVector:
     """Converts a numpy array into a hIPPYlib time-dependent vector
 
     The provided data array needs to be two-dimensional, whereas the first dimension corresponds
@@ -107,10 +105,7 @@ def nparray_to_tdv(
 
     if not all(isinstance(array, np.ndarray) for array in [timePoints, tdArray]):
         raise TypeError("Function inputs need to be numpy arrays.")
-    if not (
-        (timePoints.shape[0] == tdArray.shape[0])
-        or (timePoints.ndim == tdArray.ndim == 1)
-    ):
+    if not ((timePoints.shape[0] == tdArray.shape[0]) or (timePoints.ndim == tdArray.ndim == 1)):
         raise ValueError("Time points and value array do not match in first dimension.")
     if not len(tdArray.shape) in (1, 2):
         raise ValueError("This function only supports 1D space variables")
@@ -186,15 +181,12 @@ def pyfunc_to_fevec(
     if numSubSpaces in [0, 1]:
         if not callable(pyFuncHandle):
             raise TypeError(
-                "Need callable python object for function space"
-                " of dimension zero or one."
+                "Need callable python object for function space of dimension zero or one."
             )
         feVec = _pyfunc_to_fevec(pyFuncHandle, funcSpace)
     else:
         if not isinstance(pyFuncHandle, list) and len(list) == numSubSpaces:
-            raise TypeError(
-                "Need list of callables matching the number of FE subspaces."
-            )
+            raise TypeError("Need list of callables matching the number of FE subspaces.")
 
         subFuncs = []
         for i in range(numSubSpaces):
@@ -355,9 +347,7 @@ def process_input_data(
     """
 
     if not isinstance(inputData, (int, float, np.ndarray)):
-        raise TypeError(
-            "Domain points need to be provided as int, float, or numpy array."
-        )
+        raise TypeError("Domain points need to be provided as int, float, or numpy array.")
     if not isinstance(inputData, np.ndarray):
         inputData = np.array(inputData, ndmin=1)
     if enforce1D and inputData.ndim > 1:
@@ -391,9 +381,7 @@ def process_output_data(outputData: np.ndarray) -> Union[float, np.ndarray]:
 
 
 # ---------------------------------------------------------------------------------------------------
-def _pyfunc_to_fevec(
-    pyFuncHandle: Callable, funcSpace: fe.FunctionSpace
-) -> fe.GenericVector:
+def _pyfunc_to_fevec(pyFuncHandle: Callable, funcSpace: fe.FunctionSpace) -> fe.GenericVector:
     """Converts python callable into FEniCS vector on scalar function space"""
 
     if not isinstance(funcSpace, fe.FunctionSpace):

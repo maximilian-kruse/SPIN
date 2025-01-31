@@ -80,12 +80,8 @@ def data_pyfunc_fefunc() -> Tuple:
     )
 
     funcSpaceScalar = fe.FunctionSpace(mesh, "Lagrange", TestData.femElemDegree)
-    funcSpaceVec1D = fe.VectorFunctionSpace(
-        mesh, "Lagrange", TestData.femElemDegree, dim=1
-    )
-    funcSpaceVec2D = fe.VectorFunctionSpace(
-        mesh, "Lagrange", TestData.femElemDegree, dim=2
-    )
+    funcSpaceVec1D = fe.VectorFunctionSpace(mesh, "Lagrange", TestData.femElemDegree, dim=1)
+    funcSpaceVec2D = fe.VectorFunctionSpace(mesh, "Lagrange", TestData.femElemDegree, dim=2)
     funcSpaceTensor1D = fe.TensorFunctionSpace(
         mesh, "Lagrange", TestData.femElemDegree, shape=(1, 1), symmetry=True
     )
@@ -169,9 +165,7 @@ def test_pyfunc_to_feFunc(data_pyfunc_fefunc: Tuple) -> None:
 # ---------------------------------------------------------------------------------------------------
 def test_interpolation(data_arr_vec: Tuple) -> None:
     _, _, funcSpace = data_arr_vec
-    massMatrix = fe.assemble(
-        fe.TrialFunction(funcSpace) * fe.TestFunction(funcSpace) * fe.dx
-    )
+    massMatrix = fe.assemble(fe.TrialFunction(funcSpace) * fe.TestFunction(funcSpace) * fe.dx)
 
     simVec = hl.TimeDependentVector(TestData.simTimes)
     simVec.initialize(massMatrix, 1)

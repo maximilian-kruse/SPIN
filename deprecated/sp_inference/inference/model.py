@@ -241,20 +241,12 @@ class SDEInferenceModel:
             hl.PDEProblem: PDE variational problem
         """
 
-        self._logger.print_ljust(
-            "Construct PDE Problem:", width=self._printWidth, end=""
-        )
+        self._logger.print_ljust("Construct PDE Problem:", width=self._printWidth, end="")
         self._logger.print_dict_to_file("FEM Problem Settings", feSettings)
 
-        if (
-            self.paramsToInfer == "drift"
-            and "squared_diffusion_function" not in feSettings.keys()
-        ):
+        if self.paramsToInfer == "drift" and "squared_diffusion_function" not in feSettings.keys():
             raise ValueError("Need to specify diffusion for drift inference.")
-        if (
-            self.paramsToInfer == "diffusion"
-            and "drift_function" not in feSettings.keys()
-        ):
+        if self.paramsToInfer == "diffusion" and "drift_function" not in feSettings.keys():
             raise ValueError("Need to specify drift for diffusion inference.")
 
         femProblem = problems.FEMProblem(self._domainDim, self._solutionDim, feSettings)
@@ -328,9 +320,7 @@ class SDEInferenceModel:
         if funcSpaceParam.num_sub_spaces() == 1:
             funcSpaceParam = funcSpaceParam.extract_sub_space([0]).collapse()
 
-        priorMeanFunc = fee.convert_to_fe_function(
-            priorSettings["mean_function"], funcSpaceParam
-        )
+        priorMeanFunc = fee.convert_to_fe_function(priorSettings["mean_function"], funcSpaceParam)
         gamma, delta = hl.BiLaplacianComputeCoefficients(
             priorSettings["variance"],
             priorSettings["correlation_length"],
@@ -412,9 +402,7 @@ class SDEInferenceModel:
                     numTimePoints,
                 ):
                     raise ValueError("Data array has wrong shape.")
-                structuredData = np.array(
-                    (numSpacePoints * self._solutionDim, numTimePoints)
-                )
+                structuredData = np.array((numSpacePoints * self._solutionDim, numTimePoints))
 
                 for i in range(numTimePoints):
                     structuredData[:, i] = utils.reshape_to_fe_format(
@@ -494,9 +482,7 @@ class SDEInferenceModel:
         self._logger.print_ljust("")
 
         self.grPosterior.mean = mapParam
-        mapPwVariance, _, _ = self.grPosterior.pointwise_variance(
-            method="Randomized", r=200
-        )
+        mapPwVariance, _, _ = self.grPosterior.pointwise_variance(method="Randomized", r=200)
 
         dataStructs = {
             "file_names": self._mapFileNames,
@@ -542,9 +528,7 @@ class SDEInferenceModel:
         self.inferenceModel.solveAdj(adjointVec, [forwardVec, paramVec, None])
 
         paramGrad = self.inferenceModel.generate_vector(hl.PARAMETER)
-        self.pdeProblem.evalGradientParameter(
-            [forwardVec, paramVec, adjointVec], paramGrad
-        )
+        self.pdeProblem.evalGradientParameter([forwardVec, paramVec, adjointVec], paramGrad)
         paramGradFunc = hl.vector2Function(paramGrad, self.funcSpaces[hl.PARAMETER])
         return paramGradFunc
 
@@ -638,39 +622,29 @@ class SDEInferenceModel:
             return self._form_wrapper_all
 
     # -----------------------------------------------------------------------------------------------
-    def _form_wrapper_drift(
-        self, forwardVar: Any, paramVar: Any, adjointVar: Any
-    ) -> Any:
+    def _form_wrapper_drift(self, forwardVar: Any, paramVar: Any, adjointVar: Any) -> Any:
         """Variational form wrapper for drift function inference"""
 
         assert self._fixedParamFunction is not None, (
             "Diffusion function is not set, use construct function."
         )
-        return self._weakForm(
-            forwardVar, paramVar, self._fixedParamFunction, adjointVar
-        )
+        return self._weakForm(forwardVar, paramVar, self._fixedParamFunction, adjointVar)
 
     # -----------------------------------------------------------------------------------------------
-    def _form_wrapper_diffusion(
-        self, forwardVar: Any, paramVar: Any, adjointVar: Any
-    ) -> Any:
+    def _form_wrapper_diffusion(self, forwardVar: Any, paramVar: Any, adjointVar: Any) -> Any:
         """Variational form wrapper for diffusion function inference"""
 
         assert self._fixedParamFunction is not None, (
             "Drift function is not set, use construct function."
         )
-        return self._weakForm(
-            forwardVar, self._fixedParamFunction, paramVar, adjointVar
-        )
+        return self._weakForm(forwardVar, self._fixedParamFunction, paramVar, adjointVar)
 
     # -----------------------------------------------------------------------------------------------
     def _form_wrapper_all(self, forwardVar: Any, paramVar: Any, adjointVar: Any) -> Any:
         """Variational form wrapper for inference of drift and diffusion"""
 
         numElems = int(0.5 * self._domainDim * (self._domainDim + 1)) + self._domainDim
-        assert paramVar.ufl_shape[0] == numElems, (
-            "Mixed parameter function has wrong shape"
-        )
+        assert paramVar.ufl_shape[0] == numElems, "Mixed parameter function has wrong shape"
 
         if self._domainDim == 1:
             driftVar = fe.as_vector((paramVar[0],))
@@ -711,9 +685,7 @@ class SDEInferenceModel:
         solver.parameters["GN_iter"] = solverSettings["GN_iter"]
         solver.parameters["globalization"] = "LS"
         solver.parameters["LS"]["c_armijo"] = solverSettings["c_armijo"]
-        solver.parameters["LS"]["max_backtracking_iter"] = solverSettings[
-            "max_backtracking_iter"
-        ]
+        solver.parameters["LS"]["max_backtracking_iter"] = solverSettings["max_backtracking_iter"]
         solver.parameters["print_level"] = self._logger.verbose - 1
 
         [mapSol, mapParam, mapAdj] = solver.solve([None, initParam, None])
@@ -722,9 +694,7 @@ class SDEInferenceModel:
         )
 
         if solver.converged:
-            self._logger.print_ljust(
-                "\nConverged in " + str(solver.it) + " iterations."
-            )
+            self._logger.print_ljust("\nConverged in " + str(solver.it) + " iterations.")
         else:
             self._logger.print_ljust("\nNot Converged")
 
@@ -747,13 +717,9 @@ class SDEInferenceModel:
         single-pass alternative.
         """
 
-        self._logger.print_ljust(
-            "Construct Reduced Hessian:", width=self._printWidth, end=""
-        )
+        self._logger.print_ljust("Construct Reduced Hessian:", width=self._printWidth, end="")
 
-        self.inferenceModel.setPointForHessianEvaluations(
-            mapVars, gauss_newton_approx=False
-        )
+        self.inferenceModel.setPointForHessianEvaluations(mapVars, gauss_newton_approx=False)
         misfitHessian = hl.ReducedHessian(self.inferenceModel, misfit_only=True)
 
         randMultiVec = hl.MultiVector(
@@ -769,9 +735,9 @@ class SDEInferenceModel:
             hessianSettings["num_eigvals"],
         )
 
-        assert isinstance(eigVals, np.ndarray) and isinstance(
-            eigVecs, hl.MultiVector
-        ), "Solver has not produced a proper solution."
+        assert isinstance(eigVals, np.ndarray) and isinstance(eigVecs, hl.MultiVector), (
+            "Solver has not produced a proper solution."
+        )
 
         self._logger.print_ljust("Successful", end="\n\n")
         return [eigVals, eigVecs]
@@ -823,9 +789,7 @@ class SDEInferenceModel:
     def inferenceModel(self) -> hl.Model:
         if self._inferenceModel is None:
             try:
-                self._inferenceModel = hl.Model(
-                    self.pdeProblem, self.prior, self.misfitFunctional
-                )
+                self._inferenceModel = hl.Model(self.pdeProblem, self.prior, self.misfitFunctional)
             except:
                 raise ValueError(
                     "Need to initialize PDE problem, prior and misfit functional for "
@@ -859,9 +823,7 @@ class SDEInferenceModel:
         self._simTimes = simTimes
 
     @funcSpaces.setter
-    def funcSpaces(
-        self, funcSpaces: list[Union[fe.FunctionSpace, fe.VectorFunctionSpace]]
-    ) -> None:
+    def funcSpaces(self, funcSpaces: list[Union[fe.FunctionSpace, fe.VectorFunctionSpace]]) -> None:
         if not isinstance(funcSpaces, list):
             raise TypeError("Input does not have valid data type 'list'.")
         self._funcSpaces = funcSpaces
@@ -870,8 +832,7 @@ class SDEInferenceModel:
     def prior(self, prior: hl.modeling.prior.SqrtPrecisionPDE_Prior) -> None:
         if not isinstance(prior, hl.modeling.prior.SqrtPrecisionPDE_Prior):
             raise TypeError(
-                "Input does not have valid data type "
-                "'modeling.prior.SqrtPrecisionPDE_Prior'."
+                "Input does not have valid data type 'modeling.prior.SqrtPrecisionPDE_Prior'."
             )
         self._prior = prior
 
@@ -896,7 +857,5 @@ class SDEInferenceModel:
     @grPosterior.setter
     def grPosterior(self, grPosterior: hl.GaussianLRPosterior) -> None:
         if not isinstance(grPosterior, hl.GaussianLRPosterior):
-            raise TypeError(
-                "Input does not have valid data type 'hl.GaussianLRPosterior'"
-            )
+            raise TypeError("Input does not have valid data type 'hl.GaussianLRPosterior'")
         self._grPosterior = grPosterior

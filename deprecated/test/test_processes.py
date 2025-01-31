@@ -184,6 +184,5 @@ def _test_transient_shape(
         assert isinstance(output, np.ndarray) and output.shape == timePoints.shape
     else:
         assert (
-            isinstance(output, np.ndarray)
-            and output.shape == timePoints.shape + domainPoints.shape
+            isinstance(output, np.ndarray) and output.shape == timePoints.shape + domainPoints.shape
         )

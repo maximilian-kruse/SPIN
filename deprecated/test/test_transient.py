@@ -43,11 +43,7 @@ class TestData:
     simTimes = np.arange(startTime, endTime + timeStepSize, timeStepSize)
     obsTimes = np.array([0.5, 1.5, 2.5, 3.5, 4.5])
     obsPoints = np.array([-4.5, -3.0, -1.5, 0, 1.5, 3.0, 4.5])
-    initSol = (
-        lambda x: 1
-        / (0.25 * np.sqrt(2 * np.pi))
-        * np.exp(-0.5 * np.square(x) / 0.25**2)
-    )
+    initSol = lambda x: 1 / (0.25 * np.sqrt(2 * np.pi)) * np.exp(-0.5 * np.square(x) / 0.25**2)
 
     logSettings = {
         "params_to_infer": "all",
@@ -145,9 +141,7 @@ def misfit_setup(
 # ---------------------------------------------------------------------------------------------------
 @pytest.fixture(scope="module")
 def fem_model_setup():
-    femModel = fem.FEMProblem(
-        TestData.domainDim, TestData.solutionDim, TestData.feSettings
-    )
+    femModel = fem.FEMProblem(TestData.domainDim, TestData.solutionDim, TestData.feSettings)
     return femModel
 
 
