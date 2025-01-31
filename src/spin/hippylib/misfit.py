@@ -14,7 +14,7 @@ from petsc4py import PETSc
 # ==================================================================================================
 def assemble_pointwise_observation_operator(
     function_space: dl.FunctionSpace, observation_points: npt.NDArray[np.floating]
-) -> dl.PETScMatrix:
+) -> dl.Matrix:
     observation_matrix = hl.assemblePointwiseObservation(function_space, observation_points)
     return observation_matrix
 
@@ -29,7 +29,7 @@ def assemble_noise_precision_matrix(noise_variance: npt.NDArray[np.floating]) ->
     for i, value in enumerate(noise_precision):
         petsc_matrix.setValues(i, i, value)
     petsc_matrix.assemble()
-    precision_matrix = dl.PETScMatrix(petsc_matrix, comm=dl.MPI.comm_world)
+    precision_matrix = dl.PETScMatrix(petsc_matrix)
     return precision_matrix
 
 
@@ -38,8 +38,8 @@ class DiscreteMisfit(hl.Misfit):
     # ----------------------------------------------------------------------------------------------
     def __init__(
         self,
-        data: dl.Vector,
-        observation_matrix: dl.PETScMatrix,
+        data: npt.NDArray[np.floating],
+        observation_matrix: dl.Matrix,
         noise_precision_matrix: dl.PETScMatrix,
     ):
         self._data = data
@@ -222,7 +222,7 @@ class MisfitSettings:
                 "The observation points, values, and noise variance must be "
                 "iterables if the function space has multiple components."
             )
-        if self.stationary and self.observation_times is None:
+        if not self.stationary and self.observation_times is None:
             raise ValueError("Observation times must be provided for a time-dependent misfit.")
 
 
@@ -246,7 +246,7 @@ class MisfitBuilder:
         return misfit
 
     # ----------------------------------------------------------------------------------------------
-    def _assemble_observation_matrices(self) -> dl.PETScMatrix | list[dl.PETScMatrix]:
+    def _assemble_observation_matrices(self) -> dl.Matrix | list[dl.Matrix]:
         if self._num_components == 0:
             observation_matrices = assemble_pointwise_observation_operator(
                 self._function_space, self._observation_points
@@ -323,3 +323,5 @@ class MisfitBuilder:
                 time_misfit = VectorMisfit(time_misfit_list, self._function_space)
                 misfit_list.append(time_misfit)
             misfit = TDMisfit(misfit_list, self._observation_times)
+
+        return misfit
