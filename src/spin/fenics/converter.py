@@ -27,7 +27,7 @@ def convert_to_numpy(
     vector = vector.get_local()
     num_components = function_space.num_sub_spaces()
 
-    if num_components == 0:
+    if num_components <= 1:
         numpy_array = vector
     else:
         components = []
@@ -54,7 +54,7 @@ def get_coordinates(
 ) -> npt.NDArray[np.floating]:
     num_components = function_space.num_sub_spaces()
     coordinates = function_space.tabulate_dof_coordinates()
-    if num_components > 0:
+    if num_components > 1:
         component_dofs = function_space.sub(0).dofmap().dofs()
         coordinates = coordinates[component_dofs]
     return coordinates
