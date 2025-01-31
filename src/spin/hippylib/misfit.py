@@ -1,5 +1,6 @@
 from collections.abc import Iterable
 from dataclasses import dataclass
+from numbers import Real
 from typing import Annotated
 
 import dolfin as dl
@@ -99,7 +100,7 @@ class DiscreteMisfit(hl.Misfit):
 
 
 # ==================================================================================================
-class VectorDiscreteMisfit(hl.Misfit):
+class VectorMisfit(hl.Misfit):
     # ----------------------------------------------------------------------------------------------
     def __init__(
         self, misfit_list: Iterable[hl.Misfit], function_space_variables: dl.FunctionSpace
@@ -181,17 +182,23 @@ class VectorDiscreteMisfit(hl.Misfit):
 
 # ==================================================================================================
 class TDMisfit(hl.Misfit):
-    def __init__(stationary_misfits: Iterable[hl.Misfit]):
+    def __init__(stationary_misfits: Iterable[hl.Misfit], observation_times: Iterable[Real]):
         pass
 
 
 # ==================================================================================================
 @dataclass
 class MisfitSettings:
-    observation_points: npt.NDArray[np.floating] | Iterable[npt.NDArray[np.floating]]
-    observation_values: npt.NDArray[np.floating] | Iterable[npt.NDArray[np.floating]]
-    noise_variance: npt.NDArray[np.floating] | Iterable[npt.NDArray[np.floating]]
     function_space: dl.FunctionSpace
+    observation_points: npt.NDArray[np.floating] | Iterable[npt.NDArray[np.floating]]
+    observation_values: (
+        npt.NDArray[np.floating]
+        | Iterable[npt.NDArray[np.floating]]
+        | Iterable[Iterable[npt.NDArray[np.floating]]]
+    )
+    noise_variance: npt.NDArray[np.floating] | Iterable[npt.NDArray[np.floating]]
+    stationary: bool = True
+    observation_times: npt.NDArray[np.floating] | None = None
 
     def __post_init__(self) -> None:
         if self.function_space.num_sub_spaces() == 0 and not (
@@ -215,3 +222,104 @@ class MisfitSettings:
                 "The observation points, values, and noise variance must be "
                 "iterables if the function space has multiple components."
             )
+        if self.stationary and self.observation_times is None:
+            raise ValueError("Observation times must be provided for a time-dependent misfit.")
+
+
+# ==================================================================================================
+class MisfitBuilder:
+    # ----------------------------------------------------------------------------------------------
+    def __init__(self, settings: MisfitSettings) -> None:
+        self._function_space = settings.function_space
+        self._observation_points = settings.observation_points
+        self._observation_values = settings.observation_values
+        self._noise_variance = settings.noise_variance
+        self._stationary = settings.stationary
+        self._observation_times = settings.observation_times
+        self._num_components = self._function_space.num_sub_spaces()
+
+    # ----------------------------------------------------------------------------------------------
+    def build(self) -> hl.Misfit:
+        self._observation_matrices = self._assemble_observation_matrices()
+        self._noise_precision_matrices = self._assemble_noise_precision_matrices()
+        misfit = self._build_misfit()
+        return misfit
+
+    # ----------------------------------------------------------------------------------------------
+    def _assemble_observation_matrices(self) -> dl.PETScMatrix | list[dl.PETScMatrix]:
+        if self._num_components == 0:
+            observation_matrices = assemble_pointwise_observation_operator(
+                self._function_space, self._observation_points
+            )
+        else:
+            observation_matrices = []
+            for component_observation_points in self._observation_points:
+                component_observation_matrix = assemble_pointwise_observation_operator(
+                    self._function_space, component_observation_points
+                )
+                observation_matrices.append(component_observation_matrix)
+        return observation_matrices
+
+    # ----------------------------------------------------------------------------------------------
+    def _assemble_noise_precision_matrices(self) -> dl.PETScMatrix | list[dl.PETScMatrix]:
+        if self._num_components == 0:
+            noise_precision_matrices = assemble_noise_precision_matrix(self._noise_variance)
+        else:
+            noise_precision_matrices = []
+            for component_noise_variance in self._noise_variance:
+                component_noise_precision_matrix = assemble_noise_precision_matrix(
+                    component_noise_variance
+                )
+                noise_precision_matrices.append(component_noise_precision_matrix)
+        return noise_precision_matrices
+
+    # ----------------------------------------------------------------------------------------------
+    def _build_misfit(self) -> hl.Misfit:
+        # Single component, stationary
+        if self._num_components == 0 and self._stationary:
+            misfit = DiscreteMisfit(
+                self._observation_values, self._observation_matrices, self._noise_precision_matrices
+            )
+        # Single component, time-dependent
+        if self._num_components == 0 and not self._stationary:
+            misfit_list = []
+            for time_observation_values in self._observation_values:
+                misfit = DiscreteMisfit(
+                    time_observation_values,
+                    self._observation_matrices,
+                    self._noise_precision_matrices,
+                )
+                misfit_list.append(misfit)
+            misfit = TDMisfit(misfit_list, self._observation_times)
+        # Multiple components, stationary
+        if self._num_components > 0 and self._stationary:
+            misfit_list = []
+            for component_observation_values, observation_matrix, noise_precision_matrix in zip(
+                self._observation_values,
+                self._observation_matrices,
+                self._noise_precision_matrices,
+                strict=True,
+            ):
+                misfit = DiscreteMisfit(
+                    component_observation_values, observation_matrix, noise_precision_matrix
+                )
+                misfit_list.append(misfit)
+            misfit = VectorMisfit(misfit_list, self._function_space)
+        # Multiple components, time-dependent
+        if self._num_components > 0 and not self._stationary:
+            misfit_list = []
+            for time_observation_values in self._observation_values:
+                time_misfit_list = []
+                for component_observation_values, observation_matrix, noise_precision_matrix in zip(
+                    time_observation_values,
+                    self._observation_matrices,
+                    self._noise_precision_matrices,
+                    strict=True,
+                ):
+                    misfit = DiscreteMisfit(
+                        component_observation_values, observation_matrix, noise_precision_matrix
+                    )
+                    time_misfit_list.append(misfit)
+                time_misfit = VectorMisfit(time_misfit_list, self._function_space)
+                misfit_list.append(time_misfit)
+            misfit = TDMisfit(misfit_list, self._observation_times)
