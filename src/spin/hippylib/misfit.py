@@ -193,7 +193,7 @@ class MisfitSettings:
     noise_variance: npt.NDArray[np.floating] | Iterable[npt.NDArray[np.floating]]
     function_space: dl.FunctionSpace
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.function_space.num_sub_spaces() == 0 and not (
             isinstance(self.observation_points, np.ndarray)
             and isinstance(self.observation_values, np.ndarray)

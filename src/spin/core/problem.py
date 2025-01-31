@@ -3,7 +3,7 @@ import warnings
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from numbers import Real
-from typing import Annotated, Any
+from typing import Annotated, Any, Final
 
 import dolfin as dl
 import numpy as np
@@ -49,7 +49,7 @@ class SPINProblemSettings:
     initial_condition: str | Iterable[str] | None = None
 
 
-# ==================================================================================================
+# --------------------------------------------------------------------------------------------------
 @dataclass
 class SPINProblem:
     hippylib_variational_problem: hl.PDEProblem
@@ -66,12 +66,46 @@ class SPINProblem:
     initial_condition_array: npt.NDArray[np.floating] | None = None
 
 
+# --------------------------------------------------------------------------------------------------
+@dataclass
+class PDEType:
+    weak_form: Callable[
+        [ufl.Argument, ufl.Argument, ufl.Coefficient, ufl.tensors.ListTensor], ufl.Form
+    ]
+    num_components: Annotated[int, Is[lambda x: x > 0]]
+    stationary: bool
+
+
 # ==================================================================================================
 class SPINProblemBuilder:
+    _registered_pde_types: Final[dict[str, PDEType]] = {
+        "mean_exit_time": PDEType(
+            weak_form=weakforms.weak_form_mean_exit_time,
+            num_components=1,
+            stationary=True,
+        ),
+        "mean_exit_time_moments": PDEType(
+            weak_form=weakforms.weak_form_mean_exit_time_moments,
+            num_components=2,
+            stationary=True,
+        ),
+        "fokker_planck": PDEType(
+            weak_form=weakforms.weak_form_fokker_planck,
+            num_components=1,
+            stationary=True,
+        ),
+    }
+
     # ----------------------------------------------------------------------------------------------
     def __init__(self, settings: SPINProblemSettings) -> None:
+        try:
+            self._pde_type = self._registered_pde_types[settings.pde_type]
+        except KeyError:
+            raise ValueError(
+                f"Unknown PDE type: {settings.pde_type}, "
+                f"must be one of {self._registered_pde_types.keys()}"
+            ) from KeyError
         self._mesh = settings.mesh
-        self._pde_type = settings.pde_type
         self._inference_type = settings.inference_type
         self._element_family_variables = settings.element_family_variables
         self._element_family_parameters = settings.element_family_parameters
@@ -83,9 +117,7 @@ class SPINProblemBuilder:
         self._end_time = settings.end_time
         self._num_steps = settings.num_steps
         self._initial_condition = settings.initial_condition
-
         self._domain_dim = self._mesh.geometry().dim()
-        self._num_components = 2 if self._pde_type == "mean_exit_time_moments" else 1
 
         self._function_space_variables = None
         self._function_space_drift = None
@@ -96,7 +128,6 @@ class SPINProblemBuilder:
         self._log_squared_diffusion_function = None
         self._initial_condition_function = None
         self._boundary_condition = None
-        self._weak_form = None
         self._weak_form_wrapper = None
 
     # ----------------------------------------------------------------------------------------------
@@ -112,21 +143,20 @@ class SPINProblemBuilder:
             self._log_squared_diffusion_function,
             self._initial_condition_function,
         ) = self._compile_expressions()
+        drift_array, log_squared_diffusion_array, initial_condition_array = (
+            self._get_parameter_arrays()
+        )
         self._function_space_parameters = self._assign_parameter_function_space()
-        self._weak_form = self._assign_weak_form()
         self._boundary_condition = self._create_boundary_condition()
         self._weak_form_wrapper = self._create_weak_form_wrapper()
         variational_problem = self._create_variational_problem()
 
         coordinates_variables = fex_converter.get_coordinates(self._function_space_variables)
         coordinates_parameters = fex_converter.get_coordinates(self._function_space_drift)
-        drift_array, log_squared_diffusion_array, initial_condition_array = (
-            self._get_parameter_arrays()
-        )
 
         spin_problem = SPINProblem(
             hippylib_variational_problem=variational_problem,
-            num_variable_components=self._num_components,
+            num_variable_components=self._pde_type.num_components,
             domain_dim=self._domain_dim,
             function_space_variables=self._function_space_variables,
             function_space_parameters=self._function_space_parameters,
@@ -144,10 +174,10 @@ class SPINProblemBuilder:
     def _create_function_spaces(
         self,
     ) -> tuple[dl.FunctionSpace, dl.FunctionSpace, dl.FunctionSpace, dl.FunctionSpace]:
-        if self._num_components == 1:
+        if self._pde_type.num_components == 1:
             VariableElement = dl.FiniteElement  # noqa: N806
         else:
-            VariableElement = functools.partial(dl.VectorElement, dim=self._num_components)  # noqa: N806
+            VariableElement = functools.partial(dl.VectorElement, dim=self._pde_type_num_components)  # noqa: N806
 
         elem_variables = VariableElement(
             family=self._element_family_variables,
@@ -219,128 +249,6 @@ class SPINProblemBuilder:
         return parameter_function_space
 
     # ----------------------------------------------------------------------------------------------
-    def _assign_weak_form(
-        self,
-    ) -> Callable[[ufl.Argument, ufl.Argument, ufl.Coefficient, ufl.tensors.ListTensor], dl.Form]:
-        if self._pde_type == "mean_exit_time":
-            weak_form = weakforms.weak_form_mean_exit_time
-        elif self._pde_type == "mean_exit_time_moments":
-            weak_form = weakforms.weak_form_mean_exit_time_moments
-        elif self._pde_type == "fokker_planck":
-            weak_form = weakforms.weak_form_fokker_planck
-        return weak_form
-
-    # ----------------------------------------------------------------------------------------------
-    def _create_boundary_condition(self) -> dl.DirichletBC:
-        bc_value = 0.0 if self._num_components == 1 else (0.0,) * self._num_components
-        boundary_condition = dl.DirichletBC(
-            self._function_space_variables,
-            dl.Constant(bc_value),
-            lambda _, on_boundary: on_boundary,
-        )
-        return boundary_condition
-
-    # ----------------------------------------------------------------------------------------------
-    def _create_weak_form_wrapper(
-        self,
-    ) -> Callable[[Any, Any, Any], ufl.Form]:
-        if self._inference_type == "drift_only":
-            if self._log_squared_diffusion_function is None:
-                raise ValueError("Diffusion function is required for drift only inference.")
-
-            def weak_form_wrapper(
-                forward_variable: ufl.Argument,
-                parameter_variable: ufl.Coefficient,
-                adjoint_variable: ufl.Argument,
-            ) -> ufl.Form:
-                return self._weak_form(
-                    forward_variable,
-                    adjoint_variable,
-                    parameter_variable,
-                    self._compute_matrix_exponential(self._log_squared_diffusion_function),
-                )
-        elif self._inference_type == "diffusion_only":
-            if self._drift is None:
-                raise ValueError("Drift function is required for diffusion only inference.")
-
-            def weak_form_wrapper(
-                forward_variable: ufl.Argument,
-                parameter_variable: ufl.Coefficient,
-                adjoint_variable: ufl.Argument,
-            ) -> ufl.Form:
-                return self._weak_form(
-                    forward_variable,
-                    adjoint_variable,
-                    self._drift_function,
-                    self._compute_matrix_exponential(parameter_variable),
-                )
-        elif self._inference_type == "drift_and_diffusion":
-
-            def weak_form_wrapper(
-                forward_variable: ufl.Argument,
-                parameter_variable: ufl.Coefficient,
-                adjoint_variable: ufl.Argument,
-            ) -> ufl.Form:
-                drift_variable = [parameter_variable[i] for i in range(self._domain_dim)]
-                log_squared_diffusion_variable = [
-                    parameter_variable[i] for i in range(self._domain_dim, 2 * self._domain_dim)
-                ]
-                drift_variable = ufl.as_vector(drift_variable)
-                log_squared_diffusion_variable = ufl.as_vector(log_squared_diffusion_variable)
-                return self._weak_form(
-                    forward_variable,
-                    adjoint_variable,
-                    drift_variable,
-                    self._compute_matrix_exponential(log_squared_diffusion_variable),
-                )
-
-        return weak_form_wrapper
-
-    # ----------------------------------------------------------------------------------------------
-    def _compute_matrix_exponential(
-        self, matrix_diagonal: dl.Function | ufl.tensors.ListTensor
-    ) -> ufl.tensors.ListTensor:
-        diagonal_components = [ufl.exp(component) for component in matrix_diagonal]
-        diagonal_components = ufl.as_vector(diagonal_components)
-        matrix_exponential = ufl.diag(diagonal_components)
-        return matrix_exponential
-
-    # ----------------------------------------------------------------------------------------------
-    def _create_variational_problem(self) -> hl.PDEProblem:
-        function_space_list = (
-            self._function_space_variables,
-            self._function_space_parameters,
-            self._function_space_variables,
-        )
-        if self._pde_type == "fokker_planck":
-            if self._start_time is None or self._end_time is None or self._num_steps is None:
-                raise ValueError("Time parameters are required for Fokker-Planck PDE inference.")
-            if initial_condition is None:
-                raise ValueError("Initial condition is required for Fokker-Planck PDE inference.")
-            initial_condition = fex_converter.create_dolfin_function(
-                self._initial_condition, self._function_space_variables
-            )
-            spin_problem = hlx.TDPDELinearVariationalProblem(
-                function_space_list,
-                self._weak_form_wrapper,
-                self._boundary_condition,
-                self._boundary_condition,
-                initial_condition,
-                self._start_time,
-                self._end_time,
-                self._num_steps,
-            )
-        else:
-            spin_problem = hl.PDEVariationalProblem(
-                function_space_list,
-                self._weak_form_wrapper,
-                self._boundary_condition,
-                self._boundary_condition,
-                is_fwd_linear=True,
-            )
-        return spin_problem
-
-    # ----------------------------------------------------------------------------------------------
     def _get_parameter_arrays(
         self,
     ) -> tuple[
@@ -367,3 +275,115 @@ class SPINProblemBuilder:
         else:
             initial_condition_array = None
         return drift_array, log_squared_diffusion_array, initial_condition_array
+
+    # ----------------------------------------------------------------------------------------------
+    def _create_boundary_condition(self) -> dl.DirichletBC:
+        bc_value = (
+            0.0 if self._pde_type.num_components == 1 else (0.0,) * self._pde_type.num_components
+        )
+        boundary_condition = dl.DirichletBC(
+            self._function_space_variables,
+            dl.Constant(bc_value),
+            lambda _, on_boundary: on_boundary,
+        )
+        return boundary_condition
+
+    # ----------------------------------------------------------------------------------------------
+    def _create_weak_form_wrapper(
+        self,
+    ) -> Callable[[Any, Any, Any], ufl.Form]:
+        if self._inference_type == "drift_only":
+            if self._log_squared_diffusion_function is None:
+                raise ValueError("Diffusion function is required for drift only inference.")
+
+            def weak_form_wrapper(
+                forward_variable: ufl.Argument,
+                parameter_variable: ufl.Coefficient,
+                adjoint_variable: ufl.Argument,
+            ) -> ufl.Form:
+                return self._pde_type.weak_form(
+                    forward_variable,
+                    adjoint_variable,
+                    parameter_variable,
+                    self._compute_matrix_exponential(self._log_squared_diffusion_function),
+                )
+        elif self._inference_type == "diffusion_only":
+            if self._drift is None:
+                raise ValueError("Drift function is required for diffusion only inference.")
+
+            def weak_form_wrapper(
+                forward_variable: ufl.Argument,
+                parameter_variable: ufl.Coefficient,
+                adjoint_variable: ufl.Argument,
+            ) -> ufl.Form:
+                return self._pde_type.weak_form(
+                    forward_variable,
+                    adjoint_variable,
+                    self._drift_function,
+                    self._compute_matrix_exponential(parameter_variable),
+                )
+        elif self._inference_type == "drift_and_diffusion":
+
+            def weak_form_wrapper(
+                forward_variable: ufl.Argument,
+                parameter_variable: ufl.Coefficient,
+                adjoint_variable: ufl.Argument,
+            ) -> ufl.Form:
+                drift_variable = [parameter_variable[i] for i in range(self._domain_dim)]
+                log_squared_diffusion_variable = [
+                    parameter_variable[i] for i in range(self._domain_dim, 2 * self._domain_dim)
+                ]
+                drift_variable = ufl.as_vector(drift_variable)
+                log_squared_diffusion_variable = ufl.as_vector(log_squared_diffusion_variable)
+                return self._pde_type.weak_form(
+                    forward_variable,
+                    adjoint_variable,
+                    drift_variable,
+                    self._compute_matrix_exponential(log_squared_diffusion_variable),
+                )
+
+        return weak_form_wrapper
+
+    # ----------------------------------------------------------------------------------------------
+    def _compute_matrix_exponential(
+        self, matrix_diagonal: dl.Function | ufl.tensors.ListTensor
+    ) -> ufl.tensors.ListTensor:
+        diagonal_components = [ufl.exp(component) for component in matrix_diagonal]
+        diagonal_components = ufl.as_vector(diagonal_components)
+        matrix_exponential = ufl.diag(diagonal_components)
+        return matrix_exponential
+
+    # ----------------------------------------------------------------------------------------------
+    def _create_variational_problem(self) -> hl.PDEProblem:
+        function_space_list = (
+            self._function_space_variables,
+            self._function_space_parameters,
+            self._function_space_variables,
+        )
+        if self._pde_type.stationary:
+            spin_problem = hl.PDEVariationalProblem(
+                function_space_list,
+                self._weak_form_wrapper,
+                self._boundary_condition,
+                self._boundary_condition,
+                is_fwd_linear=True,
+            )
+        else:
+            if self._start_time is None or self._end_time is None or self._num_steps is None:
+                raise ValueError("Time parameters are required for Fokker-Planck PDE inference.")
+            if initial_condition is None:
+                raise ValueError("Initial condition is required for Fokker-Planck PDE inference.")
+            initial_condition = fex_converter.create_dolfin_function(
+                self._initial_condition, self._function_space_variables
+            )
+            spin_problem = hlx.TDPDELinearVariationalProblem(
+                function_space_list,
+                self._weak_form_wrapper,
+                self._boundary_condition,
+                self._boundary_condition,
+                initial_condition,
+                self._start_time,
+                self._end_time,
+                self._num_steps,
+            )
+        return spin_problem

@@ -26,11 +26,15 @@ def convert_to_numpy(
 ) -> npt.NDArray[np.floating]:
     vector = vector.get_local()
     num_components = function_space.num_sub_spaces()
-    components = []
-    for i in range(num_components):
-        component_dofs = function_space.sub(i).dofmap().dofs()
-        components.append(vector[component_dofs])
-    numpy_array = np.stack(components, axis=0)
+
+    if num_components == 0:
+        numpy_array = vector
+    else:
+        components = []
+        for i in range(num_components):
+            component_dofs = function_space.sub(i).dofmap().dofs()
+            components.append(vector[component_dofs])
+        numpy_array = np.stack(components, axis=0)
     return numpy_array
 
 
