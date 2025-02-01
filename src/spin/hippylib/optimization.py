@@ -24,9 +24,12 @@ class SolverSettings:
     max_num_line_search_iterations: Annotated[int, Is[lambda x: x > 0]] = 10
     verbose: bool = True
 
+
 @dataclass
 class SolverResult:
-    solution: npt.NDArray[np.floating]
+    optimal_parameter: npt.NDArray[np.floating]
+    forward_solution: npt.NDArray[np.floating]
+    adjoint_solution: npt.NDArray[np.floating]
     converged: bool
     num_iterations: Annotated[int, Is[lambda x: x >= 0]]
     termination_reason: str
@@ -63,11 +66,22 @@ class NewtonCGSolver:
             initial_guess.copy(), function_space_parameter
         )
         initial_vector = initial_function.vector()
-        _, result_vector, _ = self._hl_newtoncgsolver.solve([None, initial_vector, None])
-        result_vector = fex_converter.convert_to_numpy(result_vector, function_space_parameter)
-
+        forward_solution, optimal_parameter, adjoint_solution = self._hl_newtoncgsolver.solve(
+            [None, initial_vector, None]
+        )
+        optimal_parameter = fex_converter.convert_to_numpy(
+            optimal_parameter, function_space_parameter
+        )
+        forward_solution = fex_converter.convert_to_numpy(
+            forward_solution, function_space_parameter
+        )
+        adjoint_solution = fex_converter.convert_to_numpy(
+            adjoint_solution, function_space_parameter
+        )
         solver_result = SolverResult(
-            solution=result_vector,
+            optimal_parameter=optimal_parameter,
+            forward_solution=forward_solution,
+            adjoint_solution=adjoint_solution,
             converged=self._hl_newtoncgsolver.converged,
             num_iterations=self._hl_newtoncgsolver.it,
             termination_reason=self._hl_newtoncgsolver.termination_reasons[
