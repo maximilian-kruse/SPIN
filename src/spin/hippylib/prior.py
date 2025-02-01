@@ -21,7 +21,7 @@ class SqrtPrecisionPDEPrior(hl.prior._Prior):  # noqa: SLF001
         self,
         function_space: dl.FunctionSpace,
         variational_form_handler: Callable[[ufl.Argument, ufl.Argument], ufl.Form],
-        mean: dl.Function,
+        mean: dl.Vector | dl.PETScVector,
         cg_solver_relative_tolerance: Annotated[float, Is[lambda x: 0 < x < 1]] = 1e-12,
         cg_solver_max_iter: Annotated[int, Is[lambda x: x > 0]] = 1000,
     ) -> None:
@@ -158,6 +158,7 @@ class SqrtPrecisionPDEPrior(hl.prior._Prior):  # noqa: SLF001
     def _set_up_hippylib_interface(self) -> None:
         self.mean = self._mean
         self.M = self._mass_matrix
+        self.Msolver = self._mass_matrix_solver
         self.R = self._bilaplacian_precision_operator
         self.Rsolver = self._bilaplacian_covariance_operator
 
@@ -205,10 +206,12 @@ class BilaplacianVectorPriorBuilder:
         self._function_space = prior_settings.function_space
         self._num_components = self._function_space.num_sub_spaces()
         self._domain_dim = self._function_space.mesh().geometry().dim()
-        self._mean = fex_converter.create_dolfin_function(prior_settings.mean, self._function_space)
+        self._mean = fex_converter.create_dolfin_function(
+            prior_settings.mean, self._function_space
+        ).vector()
         self._variance = fex_converter.create_dolfin_function(
             prior_settings.variance, self._function_space
-        )
+        ).vector()
         self._correlation_length = fex_converter.create_dolfin_function(
             prior_settings.correlation_length, self._function_space
         )
@@ -241,9 +244,9 @@ class BilaplacianVectorPriorBuilder:
             self._cg_solver_relative_tolerance,
             self._cg_solver_max_iter,
         )
-        mean_array = fex_converter.convert_to_numpy(self._mean.vector(), self._function_space)
+        mean_array = fex_converter.convert_to_numpy(self._mean, self._function_space)
         variance_array = fex_converter.convert_to_numpy(
-            self._variance.vector(), self._function_space
+            self._variance, self._function_space
         )
         correlation_length_array = fex_converter.convert_to_numpy(
             self._correlation_length.vector(), self._function_space
@@ -258,7 +261,7 @@ class BilaplacianVectorPriorBuilder:
 
     # ----------------------------------------------------------------------------------------------
     def _convert_prior_coefficients(self) -> tuple[dl.Function, dl.Function]:
-        variance_array = self._variance.vector().get_local()
+        variance_array = self._variance.get_local()
         correlation_length_array = self._correlation_length.vector().get_local()
 
         sobolev_exponent = 2 - 0.5 * self._domain_dim

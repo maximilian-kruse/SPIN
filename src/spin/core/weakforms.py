@@ -4,8 +4,8 @@ import ufl
 
 # ==================================================================================================
 def weak_form_mean_exit_time(
-    forward_variable: ufl.Argument,
-    adjoint_variable: ufl.Argument,
+    forward_variable: ufl.Argument | dl.Function,
+    adjoint_variable: ufl.Argument | dl.Function,
     drift: ufl.Coefficient | ufl.tensors.ListTensor,
     squared_diffusion: ufl.tensors.ListTensor,
 ) -> ufl.Form:
@@ -21,8 +21,8 @@ def weak_form_mean_exit_time(
 
 # --------------------------------------------------------------------------------------------------
 def weak_form_mean_exit_time_moments(
-    forward_variable: ufl.Argument,
-    adjoint_variable: ufl.Argument,
+    forward_variable: ufl.Argument | dl.Function,
+    adjoint_variable: ufl.Argument | dl.Function,
     drift: ufl.Coefficient | ufl.tensors.ListTensor,
     squared_diffusion: ufl.tensors.ListTensor,
 ) -> ufl.Form:
@@ -46,8 +46,8 @@ def weak_form_mean_exit_time_moments(
 
 # --------------------------------------------------------------------------------------------------
 def weak_form_fokker_planck(
-    forward_variable: ufl.Argument,
-    adjoint_variable: ufl.Argument,
+    forward_variable: ufl.Argument | dl.Function,
+    adjoint_variable: ufl.Argument | dl.Function,
     drift: ufl.Coefficient | ufl.tensors.ListTensor,
     squared_diffusion: ufl.tensors.ListTensor,
 ) -> ufl.Form:

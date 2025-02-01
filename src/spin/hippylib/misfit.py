@@ -42,16 +42,26 @@ class DiscreteMisfit(hl.Misfit):
         observation_matrix: dl.Matrix,
         noise_precision_matrix: dl.PETScMatrix,
     ):
-        self._data = data
         self._observation_matrix = observation_matrix
         self._noise_precision_matrix = noise_precision_matrix
+        self._data = dl.Vector()
         self._vector_buffer_one = dl.Vector()
         self._vector_buffer_two = dl.Vector()
-        self._observation_matrix.init_vector(self._vector_buffer_one, 0)
+        self._observation_matrix.init_vector(self._data, 0)
+        self._data.set_local(data)
+        self._data.apply("insert")
+        self._observation_matrix.init_vector(self._vector_buffer_two, 0)
         self._observation_matrix.init_vector(self._vector_buffer_two, 0)
 
     # ----------------------------------------------------------------------------------------------
-    def cost(self, state_list: tuple[dl.Vector, dl.Vector | None, dl.Vector | None]) -> float:
+    def cost(
+        self,
+        state_list: Iterable[
+            dl.Vector | dl.PETScVector,
+            dl.Vector | dl.PETScVector | None,
+            dl.Vector | dl.PETScVector | None,
+        ],
+    ) -> Real:
         forward_vector = state_list[hl.STATE]
         self._observation_matrix.mult(forward_vector, self._vector_buffer_one)
         self._vector_buffer_one.axpy(-1.0, self._data)
@@ -63,8 +73,12 @@ class DiscreteMisfit(hl.Misfit):
     def grad(
         self,
         derivative_type: Annotated[int, IsEqual[hl.STATE] | IsEqual[hl.PARAMETER]],
-        state_list: tuple[dl.Vector, dl.Vector | None, dl.Vector | None],
-        output_vector: dl.Vector,
+        state_list: Iterable[
+            dl.Vector | dl.PETScVector,
+            dl.Vector | dl.PETScVector | None,
+            dl.Vector | dl.PETScVector | None,
+        ],
+        output_vector: dl.Vector | dl.PETScVector,
     ) -> None:
         if derivative_type == hl.STATE:
             forward_vector = state_list[hl.STATE]
@@ -78,7 +92,11 @@ class DiscreteMisfit(hl.Misfit):
     # ----------------------------------------------------------------------------------------------
     def setLinearizationPoint(  # noqa: N802
         self,
-        _state_list: tuple[dl.Vector, dl.Vector | None, dl.Vector | None],
+        _state_list: Iterable[
+            dl.Vector | dl.PETScVector | None,
+            dl.Vector | dl.PETScVector | None,
+            dl.Vector | dl.PETScVector | None,
+        ],
         _gauss_newton_approx: bool,
     ) -> None:
         pass
@@ -88,8 +106,8 @@ class DiscreteMisfit(hl.Misfit):
         self,
         first_derivative_type: Annotated[int, IsEqual[hl.STATE] | IsEqual[hl.PARAMETER]],
         second_derivative_type: Annotated[int, IsEqual[hl.STATE] | IsEqual[hl.PARAMETER]],
-        hvp_direction: dl.Vector,
-        output_vector: dl.Vector,
+        hvp_direction: dl.Vector | dl.PETScVector,
+        output_vector: dl.Vector | dl.PETScVector,
     ) -> None:
         if first_derivative_type == hl.STATE and second_derivative_type == hl.STATE:
             self._observation_matrix.mult(hvp_direction, self._vector_buffer_one)
@@ -114,7 +132,14 @@ class VectorMisfit(hl.Misfit):
         )
 
     # ----------------------------------------------------------------------------------------------
-    def cost(self, state_list: tuple[dl.Vector, dl.Vector | None, dl.Vector | None]) -> float:
+    def cost(
+        self,
+        state_list: Iterable[
+            dl.Vector | dl.PETScVector,
+            dl.Vector | dl.PETScVector | None,
+            dl.Vector | dl.PETScVector | None,
+        ],
+    ) -> float:
         forward_vector, _, _ = state_list
         component_vectors = self._get_component_vectors(forward_vector)
         cost = 0.0
@@ -126,8 +151,12 @@ class VectorMisfit(hl.Misfit):
     def grad(
         self,
         derivative_type: Annotated[int, IsEqual[hl.STATE] | IsEqual[hl.PARAMETER]],
-        state_list: tuple[dl.Vector, dl.Vector, dl.Vector],
-        output_vector: dl.Vector,
+        state_list: Iterable[
+            dl.Vector | dl.PETScVector,
+            dl.Vector | dl.PETScVector | None,
+            dl.Vector | dl.PETScVector | None,
+        ],
+        output_vector: dl.Vector | dl.PETScVector,
     ) -> None:
         forward_vector, _, _ = state_list
         component_vectors = self._get_component_vectors(forward_vector)
@@ -143,7 +172,13 @@ class VectorMisfit(hl.Misfit):
 
     # ----------------------------------------------------------------------------------------------
     def setLinearizationPoint(  # noqa: N802
-        self, _state_list: tuple[dl.Vector, dl.Vector, dl.Vector], _gauss_newton_approx: bool
+        self,
+        _state_list: Iterable[
+            dl.Vector | dl.PETScVector | None,
+            dl.Vector | dl.PETScVector | None,
+            dl.Vector | dl.PETScVector | None,
+        ],
+        _gauss_newton_approx: bool,
     ) -> None:
         pass
 
@@ -152,8 +187,8 @@ class VectorMisfit(hl.Misfit):
         self,
         first_derivative_type: Annotated[int, IsEqual[hl.STATE] | IsEqual[hl.PARAMETER]],
         second_derivative_type: Annotated[int, IsEqual[hl.STATE] | IsEqual[hl.PARAMETER]],
-        hvp_direction: dl.Vector,
-        output_vector: dl.Vector,
+        hvp_direction: dl.Vector | dl.PETScVector,
+        output_vector: dl.Vector | dl.PETScVector,
     ) -> None:
         if first_derivative_type == hl.STATE and second_derivative_type == hl.STATE:
             component_directions = self._get_component_vectors(hvp_direction)
@@ -171,7 +206,7 @@ class VectorMisfit(hl.Misfit):
             output_vector.zero()
 
     # ----------------------------------------------------------------------------------------------
-    def _get_component_vectors(self, forward_vector: dl.Vector) -> list[dl.Vector]:
+    def _get_component_vectors(self, forward_vector: dl.Vector | dl.PETScVector) -> list[dl.Vector]:
         forward_function = dl.Function(self._function_space_variables)
         forward_function.vector()[:] = forward_vector
         forward_function.vector().apply("insert")
@@ -182,7 +217,9 @@ class VectorMisfit(hl.Misfit):
 
 # ==================================================================================================
 class TDMisfit(hl.Misfit):
-    def __init__(stationary_misfits: Iterable[hl.Misfit], observation_times: Iterable[Real]):
+    def __init__(
+        self, stationary_misfits: Iterable[hl.Misfit], observation_times: Iterable[Real]
+    ) -> None:
         pass
 
 

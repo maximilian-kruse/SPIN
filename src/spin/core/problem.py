@@ -92,7 +92,7 @@ class SPINProblemBuilder:
         "fokker_planck": PDEType(
             weak_form=weakforms.weak_form_fokker_planck,
             num_components=1,
-            stationary=True,
+            stationary=False,
         ),
     }
 
@@ -297,9 +297,9 @@ class SPINProblemBuilder:
                 raise ValueError("Diffusion function is required for drift only inference.")
 
             def weak_form_wrapper(
-                forward_variable: ufl.Argument,
-                parameter_variable: ufl.Coefficient,
-                adjoint_variable: ufl.Argument,
+                forward_variable: ufl.Argument | dl.Function,
+                parameter_variable: ufl.Coefficient | dl.Function,
+                adjoint_variable: ufl.Argument | dl.Function,
             ) -> ufl.Form:
                 return self._pde_type.weak_form(
                     forward_variable,
@@ -312,9 +312,9 @@ class SPINProblemBuilder:
                 raise ValueError("Drift function is required for diffusion only inference.")
 
             def weak_form_wrapper(
-                forward_variable: ufl.Argument,
-                parameter_variable: ufl.Coefficient,
-                adjoint_variable: ufl.Argument,
+                forward_variable: dl.Argument,
+                parameter_variable: dl.Coefficient,
+                adjoint_variable: dl.Argument,
             ) -> ufl.Form:
                 return self._pde_type.weak_form(
                     forward_variable,
@@ -325,9 +325,9 @@ class SPINProblemBuilder:
         elif self._inference_type == "drift_and_diffusion":
 
             def weak_form_wrapper(
-                forward_variable: ufl.Argument,
-                parameter_variable: ufl.Coefficient,
-                adjoint_variable: ufl.Argument,
+                forward_variable: ufl.Argument | dl.Function,
+                parameter_variable: ufl.Coefficient | dl.Function,
+                adjoint_variable: ufl.Argument | dl.Function,
             ) -> ufl.Form:
                 drift_variable = [parameter_variable[i] for i in range(self._domain_dim)]
                 log_squared_diffusion_variable = [
