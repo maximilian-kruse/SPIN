@@ -22,6 +22,15 @@ class SolverSettings:
     max_num_cg_iterations: Annotated[int, Is[lambda x: x > 0]] = 100
     armijo_line_search_constant: Annotated[Real, Is[lambda x: 0 < x < 1]] = 1e-4
     max_num_line_search_iterations: Annotated[int, Is[lambda x: x > 0]] = 10
+    verbose: bool = True
+
+@dataclass
+class SolverResult:
+    solution: npt.NDArray[np.floating]
+    converged: bool
+    num_iterations: Annotated[int, Is[lambda x: x >= 0]]
+    termination_reason: str
+    final_gradient_norm: Annotated[Real, Is[lambda x: x >= 0]]
 
 
 # ==================================================================================================
@@ -36,6 +45,10 @@ class NewtonCGSolver:
         hippylib_parameterlist["GN_iter"] = solver_settings.num_gauss_newton_iterations
         hippylib_parameterlist["cg_coarse_tolerance"] = solver_settings.coarsest_tolerance_cg
         hippylib_parameterlist["cg_max_iter"] = solver_settings.max_num_cg_iterations
+        if solver_settings.verbose:
+            hippylib_parameterlist["print_level"] = 0
+        else:
+            hippylib_parameterlist["print_level"] = -1
         hippylib_parameterlist["LS"]["c_armijo"] = solver_settings.armijo_line_search_constant
         hippylib_parameterlist["LS"]["max_backtracking_iter"] = (
             solver_settings.max_num_line_search_iterations
@@ -44,12 +57,22 @@ class NewtonCGSolver:
         self._inference_model = inference_model
 
     # ----------------------------------------------------------------------------------------------
-    def solve(self, initial_guess: npt.NDArray[np.floating]) -> npt.NDArray[np.floating]:
+    def solve(self, initial_guess: npt.NDArray[np.floating]) -> SolverResult:
         function_space_parameter = self._inference_model.problem.Vh[hl.PARAMETER]
         initial_function = fex_converter.convert_to_dolfin(
             initial_guess.copy(), function_space_parameter
         )
         initial_vector = initial_function.vector()
-        self._hl_newtoncgsolver.solve([None, initial_vector, None])
-        result_vector = fex_converter.convert_to_numpy(initial_vector, function_space_parameter)
-        return result_vector
+        _, result_vector, _ = self._hl_newtoncgsolver.solve([None, initial_vector, None])
+        result_vector = fex_converter.convert_to_numpy(result_vector, function_space_parameter)
+
+        solver_result = SolverResult(
+            solution=result_vector,
+            converged=self._hl_newtoncgsolver.converged,
+            num_iterations=self._hl_newtoncgsolver.it,
+            termination_reason=self._hl_newtoncgsolver.termination_reasons[
+                self._hl_newtoncgsolver.reason
+            ],
+            final_gradient_norm=self._hl_newtoncgsolver.final_grad_norm,
+        )
+        return solver_result
