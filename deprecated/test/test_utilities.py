@@ -6,7 +6,7 @@ import pytest
 import numpy as np
 from typing import Tuple
 
-import sp_inference.utilities.general as utils
+import deprecated.sp_inference.general as utils
 import sp_inference.utilities.interpolation as interpolation
 
 with warnings.catch_warnings():
