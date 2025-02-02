@@ -13,7 +13,7 @@ import warnings
 import numpy as np
 from typing import Tuple, Union
 
-from . import general as utils
+from .. import general as utils
 
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
