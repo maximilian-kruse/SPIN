@@ -191,12 +191,40 @@ class PriorSettings:
     robin_bc_const: Real = 1.42
 
 
+# ==================================================================================================
 @dataclass
 class Prior:
     hippylib_prior: hl.prior._Prior
+    function_space: dl.FunctionSpace
     mean_array: npt.NDArray[np.floating]
     variance_array: npt.NDArray[np.floating]
     correlation_length_array: npt.NDArray[np.floating]
+
+    # ----------------------------------------------------------------------------------------------
+    def compute_variance_with_boundaries(
+        self,
+        method: Annotated[str, Is[lambda x: x in ("Exact", "Estimator", "Randomized")]],
+        num_expansion_values_estimator: Annotated[int, Is[lambda x: x > 0]] | None = None,
+        num_eigenvalues_randomized: Annotated[int, Is[lambda x: x > 0]] | None = None,
+    ) -> npt.NDArray[np.floating]:
+        if method == "Estimator":
+            if num_expansion_values_estimator is None:
+                raise ValueError(
+                    "num_expansion_values_estimator must be provided for 'Estimator' method."
+                )
+            variance = self.hippylib_prior.pointwise_variance(
+                method=method, k=num_expansion_values_estimator
+            )
+        if method == "Randomized":
+            if num_eigenvalues_randomized is None:
+                raise ValueError(
+                    "num_eigenvalues_randomized must be provided for 'Randomized' method."
+                )
+            variance = self.hippylib_prior.pointwise_variance(
+                method=method, r=num_eigenvalues_randomized
+            )
+        pointwise_variance = fex_converter.convert_to_numpy(variance, self.function_space)
+        return pointwise_variance
 
 
 # ==================================================================================================
@@ -245,14 +273,13 @@ class BilaplacianVectorPriorBuilder:
             self._cg_solver_max_iter,
         )
         mean_array = fex_converter.convert_to_numpy(self._mean, self._function_space)
-        variance_array = fex_converter.convert_to_numpy(
-            self._variance, self._function_space
-        )
+        variance_array = fex_converter.convert_to_numpy(self._variance, self._function_space)
         correlation_length_array = fex_converter.convert_to_numpy(
             self._correlation_length.vector(), self._function_space
         )
         prior = Prior(
             hippylib_prior=prior_object,
+            function_space=self._function_space,
             mean_array=mean_array,
             variance_array=variance_array,
             correlation_length_array=correlation_length_array,
