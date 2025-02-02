@@ -51,6 +51,16 @@ class SPINProblemSettings:
 
 # --------------------------------------------------------------------------------------------------
 @dataclass
+class PDEType:
+    weak_form: Callable[
+        [ufl.Argument, ufl.Argument, ufl.Coefficient, ufl.tensors.ListTensor], ufl.Form
+    ]
+    num_components: Annotated[int, Is[lambda x: x > 0]]
+    stationary: bool
+
+
+# ==================================================================================================
+@dataclass
 class SPINProblem:
     hippylib_variational_problem: hl.PDEProblem
     num_variable_components: Annotated[int, Is[lambda x: x > 0]]
@@ -65,15 +75,34 @@ class SPINProblem:
     log_squared_diffusion_array: npt.NDArray[np.floating] | None = None
     initial_condition_array: npt.NDArray[np.floating] | None = None
 
+    # ----------------------------------------------------------------------------------------------
+    def solve_forward(self, parameter_array: npt.NDArray[np.floating]) -> npt.NDArray[np.floating]:
+        parameter_vector = fex_converter.convert_to_dolfin(
+            parameter_array, self.function_space_parameters
+        ).vector()
+        forward_vector = self.hippylib_variational_problem.solveFwd([None, parameter_vector, None])
+        forward_array = fex_converter.convert_to_numpy(
+            forward_vector, self.function_space_variables
+        )
+        return forward_array
 
-# --------------------------------------------------------------------------------------------------
-@dataclass
-class PDEType:
-    weak_form: Callable[
-        [ufl.Argument, ufl.Argument, ufl.Coefficient, ufl.tensors.ListTensor], ufl.Form
-    ]
-    num_components: Annotated[int, Is[lambda x: x > 0]]
-    stationary: bool
+    # ----------------------------------------------------------------------------------------------
+    def solve_adjoint(
+        self, forward_array: npt.NDArray[np.floating], parameter_array: npt.NDArray[np.floating]
+    ) -> npt.NDArray[np.floating]:
+        forward_vector = fex_converter.convert_to_dolfin(
+            forward_array, self.function_space_variables
+        ).vector()
+        parameter_vector = fex_converter.convert_to_dolfin(
+            parameter_array, self.function_space_parameters
+        ).vector()
+        adjoint_vector = self.hippylib_variational_problem.solveAdj(
+            [forward_vector, parameter_vector, None]
+        )
+        adjoint_array = fex_converter.convert_to_numpy(
+            adjoint_vector, self.function_space_variables
+        )
+        return adjoint_array
 
 
 # ==================================================================================================
