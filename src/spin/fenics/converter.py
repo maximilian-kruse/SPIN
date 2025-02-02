@@ -1,11 +1,9 @@
 from collections.abc import Iterable
-from typing import Annotated
 
 import dolfin as dl
 import hippylib as hl
 import numpy as np
 import numpy.typing as npt
-from beartype.vale import Is
 
 
 # --------------------------------------------------------------------------------------------------
