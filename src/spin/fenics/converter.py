@@ -53,8 +53,8 @@ def convert_to_dolfin(
 def convert_multivector_to_numpy(
     multivector: hl.MultiVector, function_space: dl.FunctionSpace
 ) -> Iterable[npt.NDArray[np.floating]]:
-    num_vectors= multivector.nvec()
-    list_of_arrays=[convert_to_numpy(multivector[i], function_space) for i in range(num_vectors)]
+    num_vectors = multivector.nvec()
+    list_of_arrays = [convert_to_numpy(multivector[i], function_space) for i in range(num_vectors)]
     return list_of_arrays
 
 
