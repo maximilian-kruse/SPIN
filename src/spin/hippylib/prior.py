@@ -207,6 +207,8 @@ class Prior:
         num_expansion_values_estimator: Annotated[int, Is[lambda x: x > 0]] | None = None,
         num_eigenvalues_randomized: Annotated[int, Is[lambda x: x > 0]] | None = None,
     ) -> npt.NDArray[np.floating]:
+        if method == "Exact":
+            variance = self.hippylib_prior.pointwise_variance()
         if method == "Estimator":
             if num_expansion_values_estimator is None:
                 raise ValueError(
