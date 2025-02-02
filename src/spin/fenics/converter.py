@@ -2,6 +2,7 @@ from collections.abc import Iterable
 from typing import Annotated
 
 import dolfin as dl
+import hippylib as hl
 import numpy as np
 import numpy.typing as npt
 from beartype.vale import Is
@@ -46,6 +47,28 @@ def convert_to_dolfin(
     dolfin_function.vector().set_local(array.flatten())
     dolfin_function.vector().apply("insert")
     return dolfin_function
+
+
+# --------------------------------------------------------------------------------------------------
+def convert_multivector_to_numpy(
+    multivector: hl.MultiVector, function_space: dl.FunctionSpace
+) -> Iterable[npt.NDArray[np.floating]]:
+    num_vectors= multivector.nvec()
+    list_of_arrays=[convert_to_numpy(multivector[i], function_space) for i in range(num_vectors)]
+    return list_of_arrays
+
+
+# --------------------------------------------------------------------------------------------------
+def convert_to_multivector(
+    list_of_arrays: Iterable[npt.NDArray[np.floating]], function_space: dl.FunctionSpace
+) -> hl.MultiVector:
+    num_vectors = len(list_of_arrays)
+    size_giving_vector = convert_to_dolfin(list_of_arrays[0], function_space).vector()
+    multivector = hl.MultiVector(size_giving_vector, num_vectors)
+    for i in range(num_vectors):
+        multivector[i].set_local(list_of_arrays[i].flatten())
+        multivector[i].apply("insert")
+    return multivector
 
 
 # --------------------------------------------------------------------------------------------------
