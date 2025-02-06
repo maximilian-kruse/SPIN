@@ -80,11 +80,14 @@ class SPINProblem:
         parameter_vector = fex_converter.convert_to_dolfin(
             parameter_array, self.function_space_parameters
         ).vector()
-        forward_vector = self.hippylib_variational_problem.solveFwd([None, parameter_vector, None])
-        forward_array = fex_converter.convert_to_numpy(
-            forward_vector, self.function_space_variables
+        solution_vector = self.hippylib_variational_problem.generate_state()
+        self.hippylib_variational_problem.solveFwd(
+            solution_vector, [None, parameter_vector, None]
         )
-        return forward_array
+        solution_array = fex_converter.convert_to_numpy(
+            solution_vector, self.function_space_variables
+        )
+        return solution_array
 
     # ----------------------------------------------------------------------------------------------
     def solve_adjoint(

@@ -78,4 +78,4 @@ def get_coordinates(
     if num_components > 1:
         component_dofs = function_space.sub(0).dofmap().dofs()
         coordinates = coordinates[component_dofs]
-    return np.flip(coordinates, axis=0)
+    return coordinates
