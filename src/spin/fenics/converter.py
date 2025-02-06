@@ -39,10 +39,17 @@ def convert_to_numpy(
 
 # --------------------------------------------------------------------------------------------------
 def convert_to_dolfin(
-    array: npt.NDArray[np.floating], function_space: dl.FunctionSpace
+    array: npt.NDArray[np.floating] | Iterable[npt.NDArray[np.floating]],
+    function_space: dl.FunctionSpace,
 ) -> dl.Function:
     dolfin_function = dl.Function(function_space)
-    dolfin_function.vector().set_local(array.flatten())
+    num_components = function_space.num_sub_spaces()
+    if num_components <= 1:
+        dolfin_function.vector().set_local(array.flatten())
+    else:
+        for i in range(num_components):
+            component_dofs = function_space.sub(i).dofmap().dofs()
+            dolfin_function.vector()[component_dofs] = array[i]
     dolfin_function.vector().apply("insert")
     return dolfin_function
 
