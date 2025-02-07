@@ -10,6 +10,8 @@ import numpy.typing as npt
 from beartype.vale import IsEqual
 from petsc4py import PETSc
 
+from spin.fenics import converter as fex_converter
+
 
 # ==================================================================================================
 def assemble_pointwise_observation_operator(
@@ -64,7 +66,6 @@ class DiscreteMisfit(hl.Misfit):
     ) -> Real:
         forward_vector = state_list[hl.STATE]
         self._observation_matrix.mult(forward_vector, self._vector_buffer_one)
-        self._vector_buffer_one.axpy(-1.0, self._data)
         self._noise_precision_matrix.mult(self._vector_buffer_one, self._vector_buffer_two)
         cost = 0.5 * self._vector_buffer_one.inner(self._vector_buffer_two)
         return cost
@@ -116,19 +117,20 @@ class DiscreteMisfit(hl.Misfit):
         else:
             output_vector.zero()
 
+    # ----------------------------------------------------------------------------------------------
+    @property
+    def observation_matrix(self) -> dl.Matrix:
+        return self._observation_matrix
+
 
 # ==================================================================================================
 class VectorMisfit(hl.Misfit):
     # ----------------------------------------------------------------------------------------------
-    def __init__(
-        self, misfit_list: Iterable[hl.Misfit], function_space_variables: dl.FunctionSpace
-    ) -> None:
+    def __init__(self, misfit_list: Iterable[hl.Misfit], function_space: dl.FunctionSpace) -> None:
         self._misfit_list = misfit_list
-        self._function_space_variables = function_space_variables
-        self._output_function = dl.Function(self._function_space_variables)
-        self._component_output_functions = dl.Function(self._function_space_variables).split()
-        self._assigner = dl.FunctionAssigner(
-            self._function_space_variables, self._function_space_variables.split()
+        self._function_space = function_space
+        self._input_component_buffer, self._output_component_buffer = (
+            self._create_buffers(function_space)
         )
 
     # ----------------------------------------------------------------------------------------------
@@ -141,10 +143,12 @@ class VectorMisfit(hl.Misfit):
         ],
     ) -> float:
         forward_vector, _, _ = state_list
-        component_vectors = self._get_component_vectors(forward_vector)
+        self._input_component_buffer = fex_converter.extract_components(
+            forward_vector, self._input_component_buffer, self._function_space
+        )
         cost = 0.0
         for i, misfit in enumerate(self._misfit_list):
-            cost += misfit.cost([component_vectors[i], None, None])
+            cost += misfit.cost([self._input_component_buffer[i], None, None])
         return cost
 
     # ----------------------------------------------------------------------------------------------
@@ -159,16 +163,18 @@ class VectorMisfit(hl.Misfit):
         output_vector: dl.Vector | dl.PETScVector,
     ) -> None:
         forward_vector, _, _ = state_list
-        component_vectors = self._get_component_vectors(forward_vector)
+        self._input_component_buffer = fex_converter.extract_components(
+            forward_vector, self._input_component_buffer, self._function_space
+        )
         for i, misfit in enumerate(self._misfit_list):
             misfit.grad(
                 derivative_type,
-                [component_vectors[i], None, None],
-                self._component_output_functions[i].vector(),
+                [self._input_component_buffer[i], None, None],
+                self._output_component_buffer[i],
             )
-        self._assigner.assign(self._output_function, self._component_output_functions)
-        output_vector.zero()
-        output_vector.axpy(1.0, self._output_function.vector())
+        output_vector = fex_converter.combine_components(
+            self._output_component_buffer, output_vector, self._function_space
+        )
 
     # ----------------------------------------------------------------------------------------------
     def setLinearizationPoint(  # noqa: N802
@@ -191,28 +197,39 @@ class VectorMisfit(hl.Misfit):
         output_vector: dl.Vector | dl.PETScVector,
     ) -> None:
         if first_derivative_type == hl.STATE and second_derivative_type == hl.STATE:
-            component_directions = self._get_component_vectors(hvp_direction)
+            self._input_component_buffer = fex_converter.extract_components(
+                hvp_direction, self._input_component_buffer, self._function_space
+            )
             for i, misfit in enumerate(self._misfit_list):
                 misfit.apply_ij(
                     hl.STATE,
                     hl.STATE,
-                    component_directions[i],
-                    self._component_output_functions[i].vector(),
+                    self._input_component_buffer[i],
+                    self._output_component_buffer[i],
                 )
-            self._assigner.assign(self._output_function, self._component_output_functions)
-            output_vector.zero()
-            output_vector.axpy(1.0, self._output_function.vector())
+            output_vector = fex_converter.combine_components(
+                self._output_component_buffer, output_vector, self._function_space
+            )
         else:
             output_vector.zero()
 
     # ----------------------------------------------------------------------------------------------
-    def _get_component_vectors(self, forward_vector: dl.Vector | dl.PETScVector) -> list[dl.Vector]:
-        forward_function = dl.Function(self._function_space_variables)
-        forward_function.vector()[:] = forward_vector
-        forward_function.vector().apply("insert")
-        component_functions = function.split()
-        component_vectors = [function.vector() for function in component_functions]
-        return component_vectors
+    @staticmethod
+    def _create_buffers(
+        function_space: dl.FunctionSpace,
+    ) -> tuple[Iterable[dl.Vector], Iterable[dl.Vector]]:
+        input_component_buffer = []
+        output_component_buffer = []
+        num_sub_spaces = function_space.num_sub_spaces()
+        for i in range(num_sub_spaces):
+            input_component = dl.Vector()
+            output_component = dl.Vector()
+            input_component.init(function_space.sub(i).dim())
+            output_component.init(function_space.sub(i).dim())
+            input_component_buffer.append(input_component)
+            output_component_buffer.append(output_component)
+
+        return input_component_buffer, output_component_buffer
 
 
 # ==================================================================================================
@@ -290,9 +307,9 @@ class MisfitBuilder:
             )
         else:
             observation_matrices = []
-            for component_observation_points in self._observation_points:
+            for i in range(self._num_components):
                 component_observation_matrix = assemble_pointwise_observation_operator(
-                    self._function_space, component_observation_points
+                    self._function_space.sub(i).collapse(), self._observation_points[i]
                 )
                 observation_matrices.append(component_observation_matrix)
         return observation_matrices

@@ -61,6 +61,7 @@ class NewtonCGSolver:
 
     # ----------------------------------------------------------------------------------------------
     def solve(self, initial_guess: npt.NDArray[np.floating]) -> SolverResult:
+        function_space_variables = self._inference_model.problem.Vh[hl.STATE]
         function_space_parameter = self._inference_model.problem.Vh[hl.PARAMETER]
         initial_function = fex_converter.convert_to_dolfin(
             initial_guess.copy(), function_space_parameter
@@ -73,10 +74,10 @@ class NewtonCGSolver:
             optimal_parameter, function_space_parameter
         )
         forward_solution = fex_converter.convert_to_numpy(
-            forward_solution, function_space_parameter
+            forward_solution, function_space_variables
         )
         adjoint_solution = fex_converter.convert_to_numpy(
-            adjoint_solution, function_space_parameter
+            adjoint_solution, function_space_variables
         )
         solver_result = SolverResult(
             optimal_parameter=optimal_parameter,

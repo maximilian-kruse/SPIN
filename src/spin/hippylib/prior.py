@@ -244,7 +244,7 @@ class BilaplacianVectorPriorBuilder:
         ).vector()
         self._correlation_length = fex_converter.create_dolfin_function(
             prior_settings.correlation_length, self._function_space
-        )
+        ).vector()
         self._anisotropy_tensor = prior_settings.anisotropy_tensor
         self._cg_solver_relative_tolerance = prior_settings.cg_solver_relative_tolerance
         self._cg_solver_max_iter = prior_settings.cg_solver_max_iter
@@ -277,7 +277,7 @@ class BilaplacianVectorPriorBuilder:
         mean_array = fex_converter.convert_to_numpy(self._mean, self._function_space)
         variance_array = fex_converter.convert_to_numpy(self._variance, self._function_space)
         correlation_length_array = fex_converter.convert_to_numpy(
-            self._correlation_length.vector(), self._function_space
+            self._correlation_length, self._function_space
         )
         prior = Prior(
             hippylib_prior=prior_object,
@@ -290,8 +290,8 @@ class BilaplacianVectorPriorBuilder:
 
     # ----------------------------------------------------------------------------------------------
     def _convert_prior_coefficients(self) -> tuple[dl.Function, dl.Function]:
-        variance_array = self._variance.get_local()
-        correlation_length_array = self._correlation_length.vector().get_local()
+        variance_array = fex_converter.convert_to_numpy(self._variance, self._function_space)
+        correlation_length_array = fex_converter.convert_to_numpy(self._correlation_length, self._function_space)
 
         sobolev_exponent = 2 - 0.5 * self._domain_dim
         kappa_array = np.sqrt(8 * sobolev_exponent) / correlation_length_array

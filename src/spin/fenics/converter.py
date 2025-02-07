@@ -86,3 +86,30 @@ def get_coordinates(
         component_dofs = function_space.sub(0).dofmap().dofs()
         coordinates = coordinates[component_dofs]
     return coordinates
+
+
+# --------------------------------------------------------------------------------------------------
+def extract_components(
+    vector: dl.Vector | dl.PETScVector,
+    components: Iterable[dl.Vector | dl.PETScVector],
+    function_space: dl.FunctionSpace,
+) -> Iterable[dl.Vector | dl.PETScVector]:
+    for i, component in enumerate(components):
+        subspace = function_space.sub(i)
+        component_dofs = subspace.dofmap().dofs()
+        component.set_local(vector[component_dofs])
+        component.apply("insert")
+    return components
+
+
+# --------------------------------------------------------------------------------------------------
+def combine_components(
+    components: Iterable[dl.Vector, dl.PETScVector],
+    vector: dl.Vector | dl.PETScVector,
+    function_space: dl.FunctionSpace,
+) -> dl.Vector | dl.PETScVector:
+    for i, component in enumerate(components):
+        component_dofs = function_space.sub(i).dofmap().dofs()
+        vector[component_dofs] = component.get_local()
+    vector.apply("insert")
+    return vector

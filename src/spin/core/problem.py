@@ -81,9 +81,7 @@ class SPINProblem:
             parameter_array, self.function_space_parameters
         ).vector()
         solution_vector = self.hippylib_variational_problem.generate_state()
-        self.hippylib_variational_problem.solveFwd(
-            solution_vector, [None, parameter_vector, None]
-        )
+        self.hippylib_variational_problem.solveFwd(solution_vector, [None, parameter_vector, None])
         solution_array = fex_converter.convert_to_numpy(
             solution_vector, self.function_space_variables
         )
@@ -91,7 +89,10 @@ class SPINProblem:
 
     # ----------------------------------------------------------------------------------------------
     def solve_adjoint(
-        self, forward_array: npt.NDArray[np.floating], parameter_array: npt.NDArray[np.floating]
+        self,
+        forward_array: npt.NDArray[np.floating],
+        parameter_array: npt.NDArray[np.floating],
+        right_hand_side_array: npt.NDArray[np.floating],
     ) -> npt.NDArray[np.floating]:
         forward_vector = fex_converter.convert_to_dolfin(
             forward_array, self.function_space_variables
@@ -99,8 +100,12 @@ class SPINProblem:
         parameter_vector = fex_converter.convert_to_dolfin(
             parameter_array, self.function_space_parameters
         ).vector()
-        adjoint_vector = self.hippylib_variational_problem.solveAdj(
-            [forward_vector, parameter_vector, None]
+        right_hand_side_vector = fex_converter.convert_to_dolfin(
+            right_hand_side_array, self.function_space_variables
+        ).vector()
+        adjoint_vector = self.hippylib_variational_problem.generate_state()
+        self.hippylib_variational_problem.solveAdj(
+            adjoint_vector, [forward_vector, parameter_vector, None], right_hand_side_vector
         )
         adjoint_array = fex_converter.convert_to_numpy(
             adjoint_vector, self.function_space_variables
