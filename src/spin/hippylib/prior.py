@@ -291,16 +291,18 @@ class BilaplacianVectorPriorBuilder:
     # ----------------------------------------------------------------------------------------------
     def _convert_prior_coefficients(self) -> tuple[dl.Function, dl.Function]:
         variance_array = fex_converter.convert_to_numpy(self._variance, self._function_space)
-        correlation_length_array = fex_converter.convert_to_numpy(self._correlation_length, self._function_space)
-
+        correlation_length_array = fex_converter.convert_to_numpy(
+            self._correlation_length, self._function_space
+        )
         sobolev_exponent = 2 - 0.5 * self._domain_dim
         kappa_array = np.sqrt(8 * sobolev_exponent) / correlation_length_array
-        gamma_array = 1 / (
+        s_array = (
             np.sqrt(variance_array)
             * np.power(kappa_array, sobolev_exponent)
             * np.sqrt(np.power(4 * np.pi, 0.5 * self._domain_dim) / math.gamma(sobolev_exponent))
         )
-        delta_array = np.power(kappa_array, 2) * gamma_array
+        gamma_array = 1 / s_array
+        delta_array = np.power(kappa_array, 2) / s_array
         gamma = fex_converter.convert_to_dolfin(gamma_array, self._function_space)
         delta = fex_converter.convert_to_dolfin(delta_array, self._function_space)
         return gamma, delta

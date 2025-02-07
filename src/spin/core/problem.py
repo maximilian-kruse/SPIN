@@ -112,6 +112,31 @@ class SPINProblem:
         )
         return adjoint_array
 
+    # ----------------------------------------------------------------------------------------------
+    def evaluate_gradient(
+        self,
+        forward_array: npt.NDArray[np.floating],
+        parameter_array: npt.NDArray[np.floating],
+        adjoint_array: npt.NDArray[np.floating],
+    ) -> npt.NDArray[np.floating]:
+        forward_vector = fex_converter.convert_to_dolfin(
+            forward_array, self.function_space_variables
+        ).vector()
+        parameter_vector = fex_converter.convert_to_dolfin(
+            parameter_array, self.function_space_parameters
+        ).vector()
+        adjoint_vector = fex_converter.convert_to_dolfin(
+            adjoint_array, self.function_space_variables
+        ).vector()
+        gradient_vector = self.hippylib_variational_problem.generate_parameter()
+        self.hippylib_variational_problem.evalGradientParameter(
+            [forward_vector, parameter_vector, adjoint_vector], gradient_vector
+        )
+        gradient_array = fex_converter.convert_to_numpy(
+            gradient_vector, self.function_space_parameters
+        )
+        return gradient_array
+
 
 # ==================================================================================================
 class SPINProblemBuilder:
