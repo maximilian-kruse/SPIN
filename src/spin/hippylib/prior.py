@@ -228,6 +228,24 @@ class Prior:
         pointwise_variance = fex_converter.convert_to_numpy(variance, self.function_space)
         return pointwise_variance
 
+    # ----------------------------------------------------------------------------------------------
+    def compute_precision_with_boundaries(
+        self
+    ) -> npt.NDArray[np.floating]:
+        matrix_rows = []
+        for i in range(self.function_space.dim()):
+            input_vector = dl.Vector()
+            output_vector = dl.Vector()
+            self.hippylib_prior.init_vector(input_vector, 0)
+            self.hippylib_prior.init_vector(output_vector, 0)
+            input_vector[i] = 1.0
+            self.hippylib_prior.R.mult(input_vector, output_vector)
+            output_array = fex_converter.convert_to_numpy(output_vector, self.function_space)
+            matrix_rows.append(output_array)
+
+        precision_matrix = np.stack(matrix_rows, axis=0)
+        return precision_matrix
+
 
 # ==================================================================================================
 class BilaplacianVectorPriorBuilder:
