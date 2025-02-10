@@ -4,6 +4,7 @@ import dolfin as dl
 import hippylib as hl
 import numpy as np
 import numpy.typing as npt
+import scipy as sp
 
 
 # --------------------------------------------------------------------------------------------------
@@ -113,3 +114,21 @@ def combine_components(
         vector[component_dofs] = component.get_local()
     vector.apply("insert")
     return vector
+
+
+# --------------------------------------------------------------------------------------------------
+def convert_matrix_to_scipy(matrix: dl.Matrix | dl.PETScMatrix) -> sp.sparse.coo_array:
+    rows = []
+    columns = []
+    values = []
+
+    for i in range(matrix.size(0)):
+        non_zero_cols, non_zero_values = matrix.getrow(i)
+        rows.extend([i] * len(non_zero_cols))
+        columns.extend(non_zero_cols)
+        values.extend(non_zero_values)
+
+    scipy_matrix = sp.sparse.coo_array(
+        (values, (rows, columns)), shape=(matrix.size(0), matrix.size(1))
+    )
+    return scipy_matrix

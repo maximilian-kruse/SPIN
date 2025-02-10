@@ -7,6 +7,7 @@ import dolfin as dl
 import hippylib as hl
 import numpy as np
 import numpy.typing as npt
+import scipy as sp
 from beartype.vale import IsEqual
 from petsc4py import PETSc
 
@@ -129,8 +130,8 @@ class VectorMisfit(hl.Misfit):
     def __init__(self, misfit_list: Iterable[hl.Misfit], function_space: dl.FunctionSpace) -> None:
         self._misfit_list = misfit_list
         self._function_space = function_space
-        self._input_component_buffer, self._output_component_buffer = (
-            self._create_buffers(function_space)
+        self._input_component_buffer, self._output_component_buffer = self._create_buffers(
+            function_space
         )
 
     # ----------------------------------------------------------------------------------------------
@@ -280,6 +281,14 @@ class MisfitSettings:
             raise ValueError("Observation times must be provided for a time-dependent misfit.")
 
 
+# --------------------------------------------------------------------------------------------------
+@dataclass
+class Misfit:
+    hippylib_misfit: hl.Misfit
+    noise_precision_matrix: sp.sparse.coo_array | Iterable[sp.sparse.coo_array]
+    observation_matrix: sp.sparse.coo_array | Iterable[sp.sparse.coo_array]
+
+
 # ==================================================================================================
 class MisfitBuilder:
     # ----------------------------------------------------------------------------------------------
@@ -293,7 +302,7 @@ class MisfitBuilder:
         self._num_components = self._function_space.num_sub_spaces()
 
     # ----------------------------------------------------------------------------------------------
-    def build(self) -> hl.Misfit:
+    def build(self) -> Misfit:
         self._observation_matrices = self._assemble_observation_matrices()
         self._noise_precision_matrices = self._assemble_noise_precision_matrices()
         misfit = self._build_misfit()
@@ -314,6 +323,18 @@ class MisfitBuilder:
                 observation_matrices.append(component_observation_matrix)
         return observation_matrices
 
+    def _convert_matrices_to_scipy(
+        self, matrices: dl.Matrix | dl.PETScMatrix | Iterable[dl.Matrix | dl.PETScMatrix],
+    ) -> sp.sparse.coo_array | Iterable[sp.sparse.coo_array]:
+        if self._num_components == 0:
+            scipy_matrices = fex_converter.convert_matrix_to_scipy(matrices)
+        else:
+            scipy_matrices = []
+            for matrix in matrices:
+                scipy_matrix = fex_converter.convert_matrix_to_scipy(matrix)
+                scipy_matrices.append(scipy_matrix)
+        return scipy_matrices
+
     # ----------------------------------------------------------------------------------------------
     def _assemble_noise_precision_matrices(self) -> dl.PETScMatrix | list[dl.PETScMatrix]:
         if self._num_components == 0:
@@ -328,10 +349,10 @@ class MisfitBuilder:
         return noise_precision_matrices
 
     # ----------------------------------------------------------------------------------------------
-    def _build_misfit(self) -> hl.Misfit:
+    def _build_misfit(self) -> Misfit:
         # Single component, stationary
         if self._num_components == 0 and self._stationary:
-            misfit = DiscreteMisfit(
+            hl_misfit = DiscreteMisfit(
                 self._observation_values, self._observation_matrices, self._noise_precision_matrices
             )
         # Single component, time-dependent
@@ -344,7 +365,7 @@ class MisfitBuilder:
                     self._noise_precision_matrices,
                 )
                 misfit_list.append(misfit)
-            misfit = TDMisfit(misfit_list, self._observation_times)
+            hl_misfit = TDMisfit(misfit_list, self._observation_times)
         # Multiple components, stationary
         if self._num_components > 0 and self._stationary:
             misfit_list = []
@@ -358,7 +379,7 @@ class MisfitBuilder:
                     component_observation_values, observation_matrix, noise_precision_matrix
                 )
                 misfit_list.append(misfit)
-            misfit = VectorMisfit(misfit_list, self._function_space)
+            hl_misfit = VectorMisfit(misfit_list, self._function_space)
         # Multiple components, time-dependent
         if self._num_components > 0 and not self._stationary:
             misfit_list = []
@@ -376,6 +397,9 @@ class MisfitBuilder:
                     time_misfit_list.append(misfit)
                 time_misfit = VectorMisfit(time_misfit_list, self._function_space)
                 misfit_list.append(time_misfit)
-            misfit = TDMisfit(misfit_list, self._observation_times)
+            hl_misfit = TDMisfit(misfit_list, self._observation_times)
 
+        noise_precision_sparse = self._convert_matrices_to_scipy(self._noise_precision_matrices)
+        observation_sparse = self._convert_matrices_to_scipy(self._observation_matrices)
+        misfit = Misfit(hl_misfit, noise_precision_sparse, observation_sparse)
         return misfit

@@ -29,6 +29,7 @@ hippylib = ">=3.1.0,<4"
 fenics = "==2019.1.0"
 numpy = ">=1.26.4,<2"
 beartype = ">=0.19.0,<0.20"
+scipy = ">=1.15.1,<2"
 
 [tool.pixi.feature.dev.dependencies]
 jupyter = ">=1.1.1,<2"
