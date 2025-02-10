@@ -8,6 +8,7 @@ import dolfin as dl
 import hippylib as hl
 import numpy as np
 import numpy.typing as npt
+import scipy as sp
 import ufl
 from beartype.vale import Is
 
@@ -199,6 +200,8 @@ class Prior:
     mean_array: npt.NDArray[np.floating]
     variance_array: npt.NDArray[np.floating]
     correlation_length_array: npt.NDArray[np.floating]
+    spde_matern_matrix: sp.sparse.coo_array
+    mass_matrix: sp.sparse.coo_array
 
     # ----------------------------------------------------------------------------------------------
     def compute_variance_with_boundaries(
@@ -229,9 +232,7 @@ class Prior:
         return pointwise_variance
 
     # ----------------------------------------------------------------------------------------------
-    def compute_precision_with_boundaries(
-        self
-    ) -> npt.NDArray[np.floating]:
+    def compute_precision_with_boundaries(self) -> npt.NDArray[np.floating]:
         matrix_rows = []
         for i in range(self.function_space.dim()):
             input_vector = dl.Vector()
@@ -297,12 +298,16 @@ class BilaplacianVectorPriorBuilder:
         correlation_length_array = fex_converter.convert_to_numpy(
             self._correlation_length, self._function_space
         )
+        spde_matern_matrix = fex_converter.convert_matrix_to_scipy(prior_object._matern_sdpe_matrix)  # noqa: SLF001
+        mass_matrix = fex_converter.convert_matrix_to_scipy(prior_object._mass_matrix)  # noqa: SLF001
         prior = Prior(
             hippylib_prior=prior_object,
             function_space=self._function_space,
             mean_array=mean_array,
             variance_array=variance_array,
             correlation_length_array=correlation_length_array,
+            spde_matern_matrix=spde_matern_matrix,
+            mass_matrix=mass_matrix,
         )
         return prior
 
@@ -343,7 +348,7 @@ class BilaplacianVectorPriorBuilder:
             )
         else:
             stiffness_matrix_term = (
-                stiffness_matrix_term
+                gamma_component
                 * ufl.inner(
                     self._anisotropy_tensor * ufl.grad(trial_component), ufl.grad(test_component)
                 )
