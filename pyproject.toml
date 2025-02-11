@@ -1,5 +1,5 @@
 [project]
-authors = [{ name = "Max Kruse", email = "maximilian.kruse@kit.edu" }]
+authors = [{ name = "Maximilian Kruse", email = "maximilian.kruse@kit.edu" }]
 maintainers = [
     { name = "Maximilian Kruse", email = "maximilian.kruse@kit.edu" },
 ]

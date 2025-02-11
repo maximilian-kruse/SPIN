@@ -67,6 +67,7 @@ class DiscreteMisfit(hl.Misfit):
     ) -> Real:
         forward_vector = state_list[hl.STATE]
         self._observation_matrix.mult(forward_vector, self._vector_buffer_one)
+        self._vector_buffer_one.axpy(-1.0, self._data)
         self._noise_precision_matrix.mult(self._vector_buffer_one, self._vector_buffer_two)
         cost = 0.5 * self._vector_buffer_one.inner(self._vector_buffer_two)
         return cost
