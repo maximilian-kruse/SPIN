@@ -72,7 +72,8 @@ def convert_to_multivector(
     size_giving_vector = convert_to_dolfin(list_of_arrays[0], function_space).vector()
     multivector = hl.MultiVector(size_giving_vector, num_vectors)
     for i in range(num_vectors):
-        multivector[i].set_local(list_of_arrays[i].flatten())
+        vector = convert_to_dolfin(list_of_arrays[i], function_space).vector()
+        multivector[i].set_local(vector.get_local())
         multivector[i].apply("insert")
     return multivector
 

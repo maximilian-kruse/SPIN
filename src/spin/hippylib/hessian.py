@@ -35,7 +35,7 @@ def compute_low_rank_hessian(
     )
     misfit_hessian = hl.ReducedHessian(settings.inference_model, misfit_only=True)
     random_multivector = hl.MultiVector(
-        evaluation_point_vectors[1], settings.num_eigenvalues + settings.num_oversampling
+        evaluation_point_vectors[0], settings.num_eigenvalues + settings.num_oversampling
     )
     hl.parRandom.normal(1.0, random_multivector)
     eigenvalues, eigenvectors = hl.doublePassG(
@@ -45,5 +45,5 @@ def compute_low_rank_hessian(
         random_multivector,
         settings.num_eigenvalues,
     )
-    eigenvectors = fex_converter.convert_multivector_to_numpy(eigenvectors, function_spaces[1])
+    eigenvectors = fex_converter.convert_multivector_to_numpy(eigenvectors, function_spaces[0])
     return eigenvalues, eigenvectors

@@ -247,6 +247,18 @@ class Prior:
         precision_matrix = np.stack(matrix_rows, axis=0)
         return precision_matrix
 
+    # ----------------------------------------------------------------------------------------------
+    def evaluate_gradient(
+        self, parameter_array: npt.NDArray[np.floating]
+    ) -> npt.NDArray[np.floating]:
+        parameter_vector = fex_converter.convert_to_dolfin(
+            parameter_array, self.function_space
+        ).vector()
+        grad_vector = dl.Vector(parameter_vector)
+        self.hippylib_prior.grad(parameter_vector, grad_vector)
+        grad_array = fex_converter.convert_to_numpy(grad_vector, self.function_space)
+        return grad_array
+
 
 # ==================================================================================================
 class BilaplacianVectorPriorBuilder:
