@@ -23,7 +23,7 @@ class LowRankLaplaceApproximationSettings:
 class LowRankLaplaceApproximation:
     # ----------------------------------------------------------------------------------------------
     def __init__(self, settings: LowRankLaplaceApproximationSettings):
-        self._function_space = settings.inference_model.problem.Vh[0]
+        self._function_space = settings.inference_model.problem.Vh[1]
         self._mean = settings.mean
         low_rank_hessian_eigenvectors = fex_converter.convert_to_multivector(
             settings.low_rank_hessian_eigenvectors, self._function_space
