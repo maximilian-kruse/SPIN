@@ -17,7 +17,8 @@ Functions:
     convert_to_multivector: Convert a list of numpy arrays to a Hippylib multivector.
     get_coordinates: Get the coordinates of the mesh underlying a function space.
     extract_components: Extract components of a vector defined on a vector function space.
-    combine_components: Combine a list of component vectors into a vector on a vector function space.
+    combine_components: Combine a list of component vectors into a vector
+        on a vector function space.
     convert_matrix_to_scipy: Convert a dolfin matrix to a Scipy sparse array.
 """
 
