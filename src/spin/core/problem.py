@@ -26,22 +26,35 @@ with warnings.catch_warnings():
 # ==================================================================================================
 @dataclass
 class SPINProblemSettings:
-    """_summary_.
+    """Configuration and data for SPIN problem setup.
 
     Attributes:
-        meah (dl.Mesh): _summary_.
-        pde_type (str): _summary_.
-        inference_type (str): _summary_.
-        element_family_variables (str): _summary_.
-        element_family_parameters (str): _summary_.
-        element_degree_variables (int): _summary_.
-        element_degree_parameters (int): _summary_.
-        drift (str | Iterable[str] | None): _summary_.
-        log_squared_diffusion (str | Iterable[str] | None): _summary_.
-        start_time (Real | None): _summary_.
-        end_time (Real | None): _summary_.
-        num_steps (int | None): _summary_.
-        initial_condition (str | Iterable[str] | None): _summary_.
+        mesh (dl.Mesh): Dolfin mesh as discretization of the PDE domain.
+        pde_type (str): Identifier of the PDE to use, needs to be registered in the
+            `_registered_pde_types` dictionary of the `SPINProblemBuilder` class. Available options
+            are "mean_exit_time", "mean_exit_time_moments", and "fokker_planck".
+        inference_type (str): Type of inference, meaning which parameter(s) to infer. Available
+            options are "drift_only", "diffusion_only", and "drift_and_diffusion".
+        element_family_variables (str): FE Family for the forward and adjoint variable, according
+            to options in UFL.
+        element_family_parameters (str): FE Family for the parameter variable(s), according
+            to options in UFL.
+        element_degree_variables (int): FE degree for the forward and adjoint variable, according
+            to options in UFL.
+        element_degree_parameters (int): FE degree for the parameter variable(s), according
+            to options in UFL.
+        drift (str | Iterable[str] | None): String in dolfin syntax defining drift vector. Needs to
+            be provided as list of length corresponding to problem dimension. Only required for
+            "diffusion_only" inference mode.
+        log_squared_diffusion (str | Iterable[str] | None): String in dolfin syntax defining
+            diagonal of the log squared diffusion function. Needs to be provided as list of length
+            corresponding to problem dimension. Only required for "drift_only" inference mode.
+        start_time (Real | None): Start time for PDE solver, only required for time-dependent PDE.
+        end_time (Real | None): End time for PDE solver, only required for time-dependent PDE.
+        num_steps (int | None): Number of time steps for PDE solver, only required for
+            time-dependent PDE.
+        initial_condition (str | Iterable[str] | None): Initial condition for PDE solver, only
+            required for time-dependent PDE..
     """
     mesh: dl.Mesh
     pde_type: Annotated[
@@ -70,13 +83,17 @@ class SPINProblemSettings:
 # --------------------------------------------------------------------------------------------------
 @dataclass
 class PDEType:
-    """_summary_.
+    """Registration of PDEs, including weak form and metadata.
+
+    This class is used by the builder internally, and does not require interaction by the user.
+    Only for development purpose, when a new PDE is implemented.
 
     Attributes:
-        weak_form (Callable): _summary_.
-        num_components (int): _summary_.
-        linear (bool): _summary_.
-        stationary (bool): _summary_.
+        weak_form (Callable): Weak form in UFL syntax, defined in the
+            [`weakforms`][spin.core.weakforms] module.
+        num_components (int): Number of components of the solution/adjoint variable.
+        linear (bool): If the PDE is linear.
+        stationary (bool): If the PDE is stationary..
     """
     weak_form: Callable[
         [ufl.Argument, ufl.Argument, ufl.Coefficient, ufl.tensors.ListTensor], ufl.Form
@@ -89,26 +106,37 @@ class PDEType:
 # ==================================================================================================
 @dataclass
 class SPINProblem:
-    """_summary_.
+    """Wrapper for Hippylib PDE problem with additional data and functionaliry.
+
+    A `SPINProblem` object is returned as the output of the builder. It wraps a Hippylib PDE problem
+    to conduct inference with. It further provides data like function spaces, coordinates, etc. for
+    more transparency. Moreoever, it implements methods for forward, adjoint and gradient solves
+    with a Numpy interface.
 
     Attributes:
-        hippylib_variational_problem (hl.PDEProblem): _summary_.
-        num_variable_components (int): _summary_.
-        domain_dim (int): _summary_.
-        function_space_variables (dl.FunctionSpace): _summary_.
-        function_space_parameters (dl.FunctionSpace): _summary_.
-        function_space_drift (dl.FunctionSpace): _summary_.
-        function_space_diffusion (dl.FunctionSpace): _summary_.
-        coordinates_variables (npt.NDArray[np.floating]): _summary_.
-        coordinates_parameters (npt.NDArray[np.floating]): _summary_.
-        drift_array (npt.NDArray[np.floating] | None): _summary_.
-        log_squared_diffusion_array (npt.NDArray[np.floating] | None): _summary_.
-        initial_condition_array (npt.NDArray[np.floating] | None): _summary_.
+        hippylib_variational_problem (hl.PDEProblem): Hippylib PDE problem object.
+        num_variable_components (int): Number of components in forard/adjoint variable.
+        domain_dim (int): Dimension of the computational domain.
+        function_space_variables (dl.FunctionSpace): Function space for forward/adjoint variable.
+        function_space_parameters (dl.FunctionSpace): Function space for parameter.
+        function_space_drift (dl.FunctionSpace): Function space for the drift vector.
+        function_space_diffusion (dl.FunctionSpace): Function space for the diffusion matrix.
+        coordinates_variables (npt.NDArray[np.floating]): Coordinates for the forward/adjoint
+            variable degrees of freedom.
+        coordinates_parameters (npt.NDArray[np.floating]): Coordinates for the parameter degrees of
+            freedom.
+        drift_array (npt.NDArray[np.floating] | None): Drift function converted to numpy array, if
+            provided by the user.
+        log_squared_diffusion_array (npt.NDArray[np.floating] | None): Log squared diffusion
+            function converted to numpy array, if provided by the user.
+        initial_condition_array (npt.NDArray[np.floating] | None): Initial condition converted to
+            numpy array, if provided by the user.
 
     Methods:
-        solve_forward: _summary_.
-        solve_adjoint: _summary_.
-        evaluate_gradient: _summary_.
+        solve_forward: Solve the PDE, given a parameter.
+        solve_adjoint: Solve the adjoint equation, given parameter and forward solution.
+        evaluate_gradient: Evaluate parametric gradient, given parameter, forward, and adjoint
+            solution.
     """
     hippylib_variational_problem: hl.PDEProblem
     num_variable_components: Annotated[int, Is[lambda x: x > 0]]
@@ -125,13 +153,18 @@ class SPINProblem:
 
     # ----------------------------------------------------------------------------------------------
     def solve_forward(self, parameter_array: npt.NDArray[np.floating]) -> npt.NDArray[np.floating]:
-        """_summary_.
+        r"""Solve the defined PDE, given a parameter function.
+
+        The parameter can be drift, difusion, or both, depending on the inference mode. It has to be
+        provided according to the convention defined in the fenics
+        [`converter`][spin.fenics.converter] module. This means that the array has shape
+        $K\times N$ for $k$ components and $N$ degrees of freedom on the computational domain.
 
         Args:
-            parameter_array (npt.NDArray[np.floating]): _description_
+            parameter_array (npt.NDArray[np.floating]): Parameter function to solve PDE for.
 
         Returns:
-            npt.NDArray[np.floating]: _description_
+            npt.NDArray[np.floating]: Forward solution of the PDE
         """
         parameter_vector = fex_converter.convert_to_dolfin(
             parameter_array, self.function_space_parameters
@@ -150,15 +183,23 @@ class SPINProblem:
         parameter_array: npt.NDArray[np.floating],
         right_hand_side_array: npt.NDArray[np.floating],
     ) -> npt.NDArray[np.floating]:
-        """_summary_.
+        r"""Solve the adjoint equation for the define PDE, given parameter and forward solution.
+
+        The parameter can be drift, difusion, or both, depending on the inference mode. It has to be
+        provided according to the convention defined in the fenics
+        [`converter`][spin.fenics.converter] module. This means that the array has shape
+        $K\times N$ for $k$ components and $N$ degrees of freedom on the computational domain.
+        The forward solution can be obtained by calling the `solve_forward` method of this class.
+        Latly, the adjoint equation is solved with a given right hand side, which is typically
+        provided as the gradient of some loss functional governed by the PDE model
 
         Args:
-            forward_array (npt.NDArray[np.floating]): _description_
-            parameter_array (npt.NDArray[np.floating]): _description_
-            right_hand_side_array (npt.NDArray[np.floating]): _description_
+            forward_array (npt.NDArray[np.floating]): Forward solution of the PDE.
+            parameter_array (npt.NDArray[np.floating]): Parameter function.
+            right_hand_side_array (npt.NDArray[np.floating]): Right-hand-side for the adjoint.
 
         Returns:
-            npt.NDArray[np.floating]: _description_
+            npt.NDArray[np.floating]: Adjoint solution of the PDE problem
         """
         forward_vector = fex_converter.convert_to_dolfin(
             forward_array, self.function_space_variables
@@ -185,15 +226,22 @@ class SPINProblem:
         parameter_array: npt.NDArray[np.floating],
         adjoint_array: npt.NDArray[np.floating],
     ) -> npt.NDArray[np.floating]:
-        """_summary_.
+        r"""Evaluate the parametric gradient for parameter, forward, and adjoint solution.
+
+        The parameter can be drift, difusion, or both, depending on the inference mode. It has to be
+        provided according to the convention defined in the fenics
+        [`converter`][spin.fenics.converter] module. This means that the array has shape
+        $K\times N$ for $k$ components and $N$ degrees of freedom on the computational domain.
+        The forward solution can be obtained by calling the `solve_forward` method of this class,
+        the adjoint solution by calling the `solve_adjoint` method.
 
         Args:
-            forward_array (npt.NDArray[np.floating]): _description_
-            parameter_array (npt.NDArray[np.floating]): _description_
-            adjoint_array (npt.NDArray[np.floating]): _description_
+            forward_array (npt.NDArray[np.floating]): Forward solution
+            parameter_array (npt.NDArray[np.floating]): Parameter function
+            adjoint_array (npt.NDArray[np.floating]): Adjoint solution
 
         Returns:
-            npt.NDArray[np.floating]: _description_
+            npt.NDArray[np.floating]: Parametric gradient
         """
         forward_vector = fex_converter.convert_to_dolfin(
             forward_array, self.function_space_variables
@@ -446,6 +494,13 @@ class SPINProblemBuilder:
         npt.NDArray[np.floating] | None,
         tuple[npt.NDArray[np.floating]] | None,
     ]:
+        """Convert dolfin functions to numpy arrays, if they are provided by the user.
+
+        Returns:
+            tuple[npt.NDArray[np.floating] | None, npt.NDArray[np.floating] | None,
+                tuple[npt.NDArray[np.floating]] | None]: Drift, diffusion, and initial condition
+                as numpy arrays, if provided by the user.
+        """
         if self._drift_function is not None:
             drift_array = fex_converter.convert_to_numpy(
                 self._drift_function.vector(), self._function_space_drift
