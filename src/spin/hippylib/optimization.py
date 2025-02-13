@@ -1,6 +1,17 @@
-"""This module provides a modern wrapper to Hippylib's Newton-CG solver.
+r"""This module provides a modern wrapper to Hippylib's Newton-CG solver.
 
 Parametrization is done via data classes, all input and output vectors are numpy arrays.
+
+The provided inference Hippliyb inference model used for optimization is assumed to provide
+a cost functional in form of a negative log-posterior. Thus, the optimal parameter value found by
+the optimizer approximizes the maximum a-posterior (MAP) estimate. In SPIN, we consider Gaussian
+prior and noise models, reesulting in an optimization problem of the form
+
+$$
+    \mathbf{m}_{\text{MAP}} = \underset{\mathbf{m}}{\text{argmin}}\
+    \frac{1}{2}||\mathbf{F}(m)-\mathbf{d}_{obs}||_{R_{\text{noise}}}^2
+    +\frac{1}{2}||\mathbf{m}-\mathbf{m}_{pr}||_{R_{\text{prior}}}^2\Big).
+$$
 
 Classes:
     SolverSettings: Configuration of the Newton-CG solver.
@@ -28,18 +39,19 @@ class SolverSettings:
     All attributes have default values.
 
     Attributes:
-        relative_tolerance: Relative tolerance for the gradient norm (compared to initial guess).
-        absolute_tolerance: Absolute tolerance for the gradient norm.
-        gradient_projection_tolerance: Tolerance for the inner product (g,dm), where g is the
+        relative_tolerance (Real): Relative tolerance for the gradient norm
+            (compared to initial guess).
+        absolute_tolerance (Real): Absolute tolerance for the gradient norm.
+        gradient_projection_tolerance (Real): Tolerance for the inner product (g,dm), where g is the
             current gradient and dm the search direction.
-        max_num_newton_iterations: Maximum number of Newton iterations.
-        num_gauss_newton_iterations: Number of Gauss-Newton iterations performed initially, before
-            switching to full Newton.
-        coarsest_tolerance_cg: Termination tolerance for the conjugate gradient linear solver.
-        max_num_cg_iterations: Maximum number of conjugate gradient iterations.
-        armijo_line_search_constant: Constant for the Armijo line search.
-        max_num_line_search_iterations: Maximum number of line search iterations.
-        verbose: Whether to print the solver output.
+        max_num_newton_iterations (int): Maximum number of Newton iterations.
+        num_gauss_newton_iterations (int): Number of Gauss-Newton iterations performed initially,
+            before switching to full Newton.
+        coarsest_tolerance_cg (Real): Termination tolerance for the conjugate gradient solver.
+        max_num_cg_iterations (int): Maximum number of conjugate gradient iterations.
+        armijo_line_search_constant (Real): Constant for the Armijo line search.
+        max_num_line_search_iterations (int): Maximum number of line search iterations.
+        verbose (bool): Whether to print the solver output.
     """
 
     relative_tolerance: Annotated[Real, Is[lambda x: 0 < x < 1]] = 1e-6
@@ -59,13 +71,15 @@ class SolverResult:
     """Data class for storage of solver results.
 
     Attributes:
-        optimal_parameter: Optimal parameter, found by the optimizer.
-        forward_solution: Solution of the PDE problem for the optimal parameter.
-        adjoint_solution: Solution of the adjoint problem for the optimal parameter.
-        converged: Whether the solver has converged.
-        num_iterations: Number of Newton iterations.
-        termination_reason: Reason for termination.
-        final_gradient_norm: Final gradient norm.
+        optimal_parameter (npt.NDArray[np.floating]): Optimal parameter, found by the optimizer.
+        forward_solution (npt.NDArray[np.floating]): Solution of the PDE problem for the optimal
+            parameter.
+        adjoint_solution (npt.NDArray[np.floating]): Solution of the adjoint problem for the optimal
+            parameter.
+        converged (bool): Whether the solver has converged.
+        num_iterations (int): Number of Newton iterations.
+        termination_reason (str): Reason for termination.
+        final_gradient_norm (Real): Final gradient norm.
     """
 
     optimal_parameter: npt.NDArray[np.floating]
