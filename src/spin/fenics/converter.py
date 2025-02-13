@@ -8,6 +8,17 @@ space. For a vector with $K$ components and $N$ degrees of freedom (according to
 mesh), the resulting numpy array has shape $K\times N$. For coordinate arrays, the dimension of the
 domain is relevant. For a mesh with $N$ degrees of freedom, discretizing a domain od dimension $D$,
 the resulting array has shape $N\times D$.
+
+Functions:
+    create_dolfin_function: Compile a dolfin function from string expressions.
+    convert_to_numpy: Convert a dolfin vector to a numpy array.
+    convert_to_dolfin: Convert a numpy array to a dolfin function.
+    convert_multivector_to_numpy: Convert a Hippylib multivector to a list of numpy arrays.
+    convert_to_multivector: Convert a list of numpy arrays to a Hippylib multivector.
+    get_coordinates: Get the coordinates of the mesh underlying a function space.
+    extract_components: Extract components of a vector defined on a vector function space.
+    combine_components: Combine a list of component vectors into a vector on a vector function space.
+    convert_matrix_to_scipy: Convert a dolfin matrix to a Scipy sparse array.
 """
 
 from collections.abc import Iterable
