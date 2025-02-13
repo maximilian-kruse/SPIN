@@ -239,7 +239,7 @@ class TDMisfit(hl.Misfit):
     def __init__(
         self, stationary_misfits: Iterable[hl.Misfit], observation_times: Iterable[Real]
     ) -> None:
-        pass
+        raise NotImplementedError("Time-dependent problems are not implemented yet.")
 
 
 # ==================================================================================================

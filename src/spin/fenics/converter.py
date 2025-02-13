@@ -61,7 +61,7 @@ def create_dolfin_function(
     num_components = function_space.num_sub_spaces()
     if num_components == 0 and not isinstance(string_expression, str):
         raise ValueError("Only a single string expression is allowed for scalar function spaces.")
-    elif not (isinstance(string_expression, Iterable) and num_components != len(string_expression)):  # noqa: RET506
+    elif not (isinstance(string_expression, Iterable) and num_components == len(string_expression)):  # noqa: RET506
         raise ValueError(
             f"Number of expression strings ({len(string_expression)})"
             f" must match number of components in function space space ({num_components})."
@@ -209,7 +209,7 @@ def convert_to_multivector(
     Returns:
         hl.MultiVector: Output multivector.
     """
-    for i, array in list_of_arrays:
+    for i, array in enumerate(list_of_arrays):
         if not array.size == function_space.dim():
             raise ValueError(
                 f"Size ({array.size}) of array {i} does not match "
