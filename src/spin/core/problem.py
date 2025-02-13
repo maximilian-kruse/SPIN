@@ -56,6 +56,7 @@ class PDEType:
         [ufl.Argument, ufl.Argument, ufl.Coefficient, ufl.tensors.ListTensor], ufl.Form
     ]
     num_components: Annotated[int, Is[lambda x: x > 0]]
+    linear: bool
     stationary: bool
 
 
@@ -144,16 +145,19 @@ class SPINProblemBuilder:
         "mean_exit_time": PDEType(
             weak_form=weakforms.weak_form_mean_exit_time,
             num_components=1,
+            linear=True,
             stationary=True,
         ),
         "mean_exit_time_moments": PDEType(
             weak_form=weakforms.weak_form_mean_exit_time_moments,
             num_components=2,
+            linear=True,
             stationary=True,
         ),
         "fokker_planck": PDEType(
             weak_form=weakforms.weak_form_fokker_planck,
             num_components=1,
+            linear=True,
             stationary=False,
         ),
     }
@@ -428,7 +432,7 @@ class SPINProblemBuilder:
                 self._weak_form_wrapper,
                 self._boundary_condition,
                 self._boundary_condition,
-                is_fwd_linear=True,
+                is_fwd_linear=self._pde_type.linear,
             )
         else:
             if self._start_time is None or self._end_time is None or self._num_steps is None:
@@ -438,6 +442,7 @@ class SPINProblemBuilder:
             initial_condition = fex_converter.create_dolfin_function(
                 self._initial_condition, self._function_space_variables
             )
+            raise NotImplementedError("Time-dependent PDE inference is not yet implemented.")
             spin_problem = hlx.TDPDELinearVariationalProblem(
                 function_space_list,
                 self._weak_form_wrapper,
@@ -447,5 +452,6 @@ class SPINProblemBuilder:
                 self._start_time,
                 self._end_time,
                 self._num_steps,
+                is_fwd_linear=self._pde_type.linear,
             )
         return spin_problem
