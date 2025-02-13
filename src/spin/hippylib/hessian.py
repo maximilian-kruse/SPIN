@@ -86,7 +86,9 @@ def compute_low_rank_hessian(
     \begin{gather*}
         \mathbf{H} = \mathbf{R}_{\text{prior}}
         + \mathbf{R}_{\text{prior}}\mathbf{V}_r\mathbf{D}_r\mathbf{V}_r^T\mathbf{R}_{\text{prior}}
-        + \mathcal{O}\big(\sum_{i=r+1}^n\lambda_i\big).
+        + \mathcal{O}\big(\sum_{i=r+1}^n\lambda_i\big), \\
+        \mathbf{V}_r = [\mathbf{v}_1,\ldots,\mathbf{v}_r], \\
+        \mathbf{D}_r = \text{diag}(\lambda_1,\ldots,\lambda_r).
     \end{gather*}
     $$
 
