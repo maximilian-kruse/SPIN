@@ -1,3 +1,21 @@
+"""Wrapper for the Gaussian low-rank posterior object in hippylib.
+
+This module provides the functionality for the so-called Laplace approximation of the posterior,
+a method of variational inference. The Laplace approximation is based on the linearization of the
+forward map that governs the inverse problem, typically about the MAP point. In combination with
+a Gaussian prior and likelihood, the Laplace approximation results in a Gaussian posterior, defined
+by a mean function (the MAP estimate), and the local Hessian at that point.
+
+The Laplace-approximation relies on the `GaussianLRPosterior` object in Hippylib, which takes a
+low-rank approximation of the Hessian as input. This low-rank approximation is computed in SPIN
+using the [`compute_low_rank_hessian`][spin.hippylib.hessian.compute_low_rank_hessian] function.
+The MAP can be found using the Newton-CG solver in Hippylib, which is wrapped in the
+[`NewtonCGSolver`][spin.hippylib.optimization.NewtonCGSolver] class for SPIN applications.
+
+Classes:
+    LowRankLaplaceApproximationSettings: Input for the low-rank Laplace approximation object.
+    LowRankLaplaceApproximation: Wrapper for the low-rank Laplace approximation object.
+"""
 from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Annotated
@@ -13,6 +31,16 @@ from spin.fenics import converter as fex_converter
 # ==================================================================================================
 @dataclass
 class LowRankLaplaceApproximationSettings:
+    """Input for the low-rank Laplace approximation object.
+
+    Attributes:
+        inference_model (hl.Model): Hippylib inference model object.
+        mean (npt.NDArray[np.floating]): Mean function (usually the MAP).
+        low_rank_hessian_eigenvalues (npt.NDArray[np.floating]): Eigenvalues for low-rank
+            approximation of the negative log-posterior Hessian (at the MAP).
+        low_rank_hessian_eigenvectors (Iterable[npt.NDArray[np.floating]]): Eigenvectors for
+            low-rank approximation of the negative log-posterior Hessian (at the MAP).
+    """
     inference_model: hl.Model
     mean: np.ndarray
     low_rank_hessian_eigenvalues: npt.NDArray[np.floating]
@@ -21,8 +49,19 @@ class LowRankLaplaceApproximationSettings:
 
 # ==================================================================================================
 class LowRankLaplaceApproximation:
+    """Low-rank Laplace approximation of the posterior distribution.
+
+    Methods:
+        compute_pointwise_variance: Compute the pointwise variance for the Laplace approximation.
+    """
+
     # ----------------------------------------------------------------------------------------------
-    def __init__(self, settings: LowRankLaplaceApproximationSettings):
+    def __init__(self, settings: LowRankLaplaceApproximationSettings) -> None:
+        """Initialize the underlying hippylib object.
+
+        Args:
+            settings (LowRankLaplaceApproximationSettings): Input data for the approximation.
+        """
         self._function_space = settings.inference_model.problem.Vh[1]
         self._mean = settings.mean
         low_rank_hessian_eigenvectors = fex_converter.convert_to_multivector(
@@ -43,6 +82,29 @@ class LowRankLaplaceApproximation:
         num_expansion_values_estimator: Annotated[int, Is[lambda x: x > 0]] | None = None,
         num_eigenvalues_randomized: Annotated[int, Is[lambda x: x > 0]] | None = None,
     ) -> npt.NDArray[np.floating]:
+        """Compute the pointwise variance field of the laplace approximation.
+
+        For a detailed description of the different methods, we refer to the documentation of the
+        [`GaussianLRPosterior`](https://hippylib.readthedocs.io/en/latest/hippylib.modeling.html?highlight=posterior#hippylib.modeling.posterior.GaussianLRPosterior)
+        object in Hippylib.
+
+        Args:
+            method (str): Algorithm for computation of the variance, options are 'Exact',
+                'Estimator', and 'Randomized'.
+            num_expansion_values_estimator (int, optional): Number of expansion terms for the
+                estimator algorithm. Defaults to None.
+            num_eigenvalues_randomized (int, optional): Number of dominant eigenvalues for the
+                randomized algorithm. Defaults to None.
+
+        Raises:
+            ValueError: Checks that `num_expansion_values_estimator` is provided for the 'Estimator'
+                algorithm
+            ValueError: Checks that `num_eigenvalues_randomized` is provided for the 'Randomized'
+                algorithm
+
+        Returns:
+            npt.NDArray[np.floating]: Pointwise variance field.
+        """
         if method == "Exact":
             variance = self._laplace_approximation.pointwise_variance()
         if method == "Estimator":
@@ -67,4 +129,5 @@ class LowRankLaplaceApproximation:
     # ----------------------------------------------------------------------------------------------
     @property
     def hippylib_gaussian_posterior(self) -> hl.GaussianLRPosterior:
+        """Return the underlying `GaussianLRPosterior` Hippylib object."""
         return self._laplace_approximation

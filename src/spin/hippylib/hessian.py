@@ -5,6 +5,13 @@ via dataclasses, all input and output vectors are numpy arrays.
 
 Internally, the module uses the double-pass algorithm in Hippylib, to compute a randomized truncated
 SVD of the Hessian operator of the provided Hippylib inference model.
+
+Classes:
+    LowRankHessianSettings: Configuration for the low-rank computation
+
+Functions:
+    compute_low_rank_hessian: Compute the low-rank Hessian approximation of the inference model
+        posterior at a given evaluation point.
 """
 
 from collections.abc import Iterable
@@ -73,16 +80,17 @@ def compute_low_rank_hessian(
         \quad \lamba_1m \geq \ldots \geq \lambda_r.
     $$
 
-    The low-rank approximation of the Hessian can then be constructed from the Sherman-Morrison-
-    Woodbury formula,
+    The low-rank approximation of the Hessian can then be constructed as
 
     $$
     \begin{gather*}
-        \mathbf{H}^{-1} = \mathbf{R}_{\text{prior}}^{-1} - \mathbf{V}_r\mathbf{D}_r\mathbf{V}_r^T
-        + \mathcal{O}\Big(\sum_{i=r+1}^n\frac{\lambda_i}{\lambda_i+1}\Big).
+        \mathbf{H} = \mathbf{R}_{\text{prior}}
+        + \mathbf{R}_{\text{prior}}\mathbf{V}_r\mathbf{D}_r\mathbf{V}_r^T\mathbf{R}_{\text{prior}}
+        + \mathcal{O}\big(\sum_{i=r+1}^n\lambda_i\big).
     \end{gather*}
     $$
 
+    The inverse can then be appoximated with the Sherman-Morrison-Woodbury formula.
     Apparently, the approximation is good if the trailing eigenvalues $\lambda_i, i=r+1,\ldots,n$
     are small, corresponding to compactness of the Hessian operator.
 
