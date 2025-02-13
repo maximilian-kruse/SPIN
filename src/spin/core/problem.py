@@ -1,3 +1,4 @@
+"""summary."""
 import functools
 import warnings
 from collections.abc import Callable, Iterable
@@ -25,6 +26,23 @@ with warnings.catch_warnings():
 # ==================================================================================================
 @dataclass
 class SPINProblemSettings:
+    """_summary_.
+
+    Attributes:
+        meah (dl.Mesh): _summary_.
+        pde_type (str): _summary_.
+        inference_type (str): _summary_.
+        element_family_variables (str): _summary_.
+        element_family_parameters (str): _summary_.
+        element_degree_variables (int): _summary_.
+        element_degree_parameters (int): _summary_.
+        drift (str | Iterable[str] | None): _summary_.
+        log_squared_diffusion (str | Iterable[str] | None): _summary_.
+        start_time (Real | None): _summary_.
+        end_time (Real | None): _summary_.
+        num_steps (int | None): _summary_.
+        initial_condition (str | Iterable[str] | None): _summary_.
+    """
     mesh: dl.Mesh
     pde_type: Annotated[
         str, Is[lambda pde: pde in ["mean_exit_time", "mean_exit_time_moments", "fokker_planck"]]
@@ -52,6 +70,14 @@ class SPINProblemSettings:
 # --------------------------------------------------------------------------------------------------
 @dataclass
 class PDEType:
+    """_summary_.
+
+    Attributes:
+        weak_form (Callable): _summary_.
+        num_components (int): _summary_.
+        linear (bool): _summary_.
+        stationary (bool): _summary_.
+    """
     weak_form: Callable[
         [ufl.Argument, ufl.Argument, ufl.Coefficient, ufl.tensors.ListTensor], ufl.Form
     ]
@@ -63,6 +89,27 @@ class PDEType:
 # ==================================================================================================
 @dataclass
 class SPINProblem:
+    """_summary_.
+
+    Attributes:
+        hippylib_variational_problem (hl.PDEProblem): _summary_.
+        num_variable_components (int): _summary_.
+        domain_dim (int): _summary_.
+        function_space_variables (dl.FunctionSpace): _summary_.
+        function_space_parameters (dl.FunctionSpace): _summary_.
+        function_space_drift (dl.FunctionSpace): _summary_.
+        function_space_diffusion (dl.FunctionSpace): _summary_.
+        coordinates_variables (npt.NDArray[np.floating]): _summary_.
+        coordinates_parameters (npt.NDArray[np.floating]): _summary_.
+        drift_array (npt.NDArray[np.floating] | None): _summary_.
+        log_squared_diffusion_array (npt.NDArray[np.floating] | None): _summary_.
+        initial_condition_array (npt.NDArray[np.floating] | None): _summary_.
+
+    Methods:
+        solve_forward: _summary_.
+        solve_adjoint: _summary_.
+        evaluate_gradient: _summary_.
+    """
     hippylib_variational_problem: hl.PDEProblem
     num_variable_components: Annotated[int, Is[lambda x: x > 0]]
     domain_dim: Annotated[int, Is[lambda x: x > 0]]
@@ -78,6 +125,14 @@ class SPINProblem:
 
     # ----------------------------------------------------------------------------------------------
     def solve_forward(self, parameter_array: npt.NDArray[np.floating]) -> npt.NDArray[np.floating]:
+        """_summary_.
+
+        Args:
+            parameter_array (npt.NDArray[np.floating]): _description_
+
+        Returns:
+            npt.NDArray[np.floating]: _description_
+        """
         parameter_vector = fex_converter.convert_to_dolfin(
             parameter_array, self.function_space_parameters
         ).vector()
@@ -95,6 +150,16 @@ class SPINProblem:
         parameter_array: npt.NDArray[np.floating],
         right_hand_side_array: npt.NDArray[np.floating],
     ) -> npt.NDArray[np.floating]:
+        """_summary_.
+
+        Args:
+            forward_array (npt.NDArray[np.floating]): _description_
+            parameter_array (npt.NDArray[np.floating]): _description_
+            right_hand_side_array (npt.NDArray[np.floating]): _description_
+
+        Returns:
+            npt.NDArray[np.floating]: _description_
+        """
         forward_vector = fex_converter.convert_to_dolfin(
             forward_array, self.function_space_variables
         ).vector()
@@ -120,6 +185,16 @@ class SPINProblem:
         parameter_array: npt.NDArray[np.floating],
         adjoint_array: npt.NDArray[np.floating],
     ) -> npt.NDArray[np.floating]:
+        """_summary_.
+
+        Args:
+            forward_array (npt.NDArray[np.floating]): _description_
+            parameter_array (npt.NDArray[np.floating]): _description_
+            adjoint_array (npt.NDArray[np.floating]): _description_
+
+        Returns:
+            npt.NDArray[np.floating]: _description_
+        """
         forward_vector = fex_converter.convert_to_dolfin(
             forward_array, self.function_space_variables
         ).vector()
@@ -141,6 +216,7 @@ class SPINProblem:
 
 # ==================================================================================================
 class SPINProblemBuilder:
+    """_summary_."""
     _registered_pde_types: Final[dict[str, PDEType]] = {
         "mean_exit_time": PDEType(
             weak_form=weakforms.weak_form_mean_exit_time,
@@ -164,6 +240,14 @@ class SPINProblemBuilder:
 
     # ----------------------------------------------------------------------------------------------
     def __init__(self, settings: SPINProblemSettings) -> None:
+        """_summary_.
+
+        Args:
+            settings (SPINProblemSettings): _description_
+
+        Raises:
+            ValueError: _description_
+        """
         try:
             self._pde_type = self._registered_pde_types[settings.pde_type]
         except KeyError:
@@ -198,28 +282,42 @@ class SPINProblemBuilder:
 
     # ----------------------------------------------------------------------------------------------
     def build(self) -> SPINProblem:
+        """Main interface of the builder, returning a SPINProblem object.
+
+        The builder internally cals a sequence of methods that result in a Hippylib `PDEProblem`
+        object to be used for inference.
+
+        Returns:
+            SPINProblem: Object wrapping the Hippylib `PDEProblem` with additional methods and
+                metadata
+        """
+        # Set up function spaces
         (
             self._function_space_variables,
             self._function_space_drift,
             self._function_space_diffusion,
             self._function_space_composite,
         ) = self._create_function_spaces()
+        # Compile available dolfin expressions
         (
             self._drift_function,
             self._log_squared_diffusion_function,
             self._initial_condition_function,
         ) = self._compile_expressions()
+        # Convert given dolfin functions to arrays
         drift_array, log_squared_diffusion_array, initial_condition_array = (
             self._get_parameter_arrays()
         )
+        # Get mesh coordinates
+        coordinates_variables = fex_converter.get_coordinates(self._function_space_variables)
+        coordinates_parameters = fex_converter.get_coordinates(self._function_space_drift)
+        # Assemble weak form and boundary condition, depending on PDE type and inference mode
         self._function_space_parameters = self._assign_parameter_function_space()
         self._boundary_condition = self._create_boundary_condition()
         self._weak_form_wrapper = self._create_weak_form_wrapper()
+        # Create a hippylip PDEProblem object
         variational_problem = self._create_variational_problem()
-
-        coordinates_variables = fex_converter.get_coordinates(self._function_space_variables)
-        coordinates_parameters = fex_converter.get_coordinates(self._function_space_drift)
-
+        # Return output as SPINProblem object
         spin_problem = SPINProblem(
             hippylib_variational_problem=variational_problem,
             num_variable_components=self._pde_type.num_components,
@@ -240,6 +338,17 @@ class SPINProblemBuilder:
     def _create_function_spaces(
         self,
     ) -> tuple[dl.FunctionSpace, dl.FunctionSpace, dl.FunctionSpace, dl.FunctionSpace]:
+        """Create function spaces for variables, drift, diffusion, and composite parameters.
+
+        The precise form of the function spaces depends on the PDE typ and inference mode.
+        For scalar PDEs, the solution and adjoint variable space is scalae, otherwise it is vector-
+        valued. The drift and diffusion spaces are always vector-valued, while the composite space
+        is a  vector space comprising both the drift and diffusion components.
+
+        Returns:
+            tuple[dl.FunctionSpace, dl.FunctionSpace, dl.FunctionSpace, dl.FunctionSpace]:
+                Tuple of function spaces for variables, drift, diffusion, and composite parameters.
+        """
         if self._pde_type.num_components == 1:
             VariableElement = dl.FiniteElement  # noqa: N806
         else:
@@ -284,6 +393,16 @@ class SPINProblemBuilder:
     def _compile_expressions(
         self,
     ) -> tuple[dl.Function | None, dl.Function | None, dl.Function | None]:
+        """Generate dolfin expressions from strings, if they are provided.
+
+        Depending on the inference mode, different expressions need to be provided. Their
+        existence is checked upon assemble of the PDE problem.
+
+        Returns:
+            tuple[dl.Function | None, dl.Function | None, dl.Function | None]: Created dolfin
+                functions for drift, diffusion, and initial condition, if their string
+                representation has been provided
+        """
         if self._drift is not None:
             drift_function = fex_converter.create_dolfin_function(
                 self._drift, self._function_space_drift
@@ -306,6 +425,11 @@ class SPINProblemBuilder:
 
     # ----------------------------------------------------------------------------------------------
     def _assign_parameter_function_space(self) -> dl.FunctionSpace:
+        """Decide which function space is the parameter space, depending on inference type.
+
+        Returns:
+            dl.FunctionSpace: Space to use for the parameter variable
+        """
         if self._inference_type == "drift_only":
             parameter_function_space = self._function_space_drift
         elif self._inference_type == "diffusion_only":
@@ -344,6 +468,11 @@ class SPINProblemBuilder:
 
     # ----------------------------------------------------------------------------------------------
     def _create_boundary_condition(self) -> dl.DirichletBC:
+        """Create homogeneous Dirichlet Boundary conditions on the given mesh.
+
+        Returns:
+            dl.DirichletBC: Dolfin boundary conditions
+        """
         bc_value = (
             0.0 if self._pde_type.num_components == 1 else (0.0,) * self._pde_type.num_components
         )
@@ -358,6 +487,8 @@ class SPINProblemBuilder:
     def _create_weak_form_wrapper(
         self,
     ) -> Callable[[Any, Any, Any], ufl.Form]:
+
+        # Drift only: Drift is parameter, diffusion needs to be given as coefficient function
         if self._inference_type == "drift_only":
             if self._log_squared_diffusion_function is None:
                 raise ValueError("Diffusion function is required for drift only inference.")
@@ -373,6 +504,8 @@ class SPINProblemBuilder:
                     parameter_variable,
                     self._compute_matrix_exponential(self._log_squared_diffusion_function),
                 )
+
+        # Diffusion only: Diffusion is parameter, drift needs to be given as coefficient function
         elif self._inference_type == "diffusion_only":
             if self._drift is None:
                 raise ValueError("Drift function is required for diffusion only inference.")
@@ -388,6 +521,8 @@ class SPINProblemBuilder:
                     self._drift_function,
                     self._compute_matrix_exponential(parameter_variable),
                 )
+
+        # Drift and diffusion: Both drift and diffusion are parameters, on composite space
         elif self._inference_type == "drift_and_diffusion":
 
             def weak_form_wrapper(
@@ -414,6 +549,14 @@ class SPINProblemBuilder:
     def _compute_matrix_exponential(
         self, matrix_diagonal: dl.Function | ufl.tensors.ListTensor
     ) -> ufl.tensors.ListTensor:
+        """Create matrix exponential for diagonal matrix in UFL syntax.
+
+        Args:
+            matrix_diagonal (dl.Function | ufl.tensors.ListTensor): Diagonal entries
+
+        Returns:
+            ufl.tensors.ListTensor: Diagonal matrix exponential
+        """
         diagonal_components = [ufl.exp(component) for component in matrix_diagonal]
         diagonal_components = ufl.as_vector(diagonal_components)
         matrix_exponential = ufl.diag(diagonal_components)
@@ -421,6 +564,16 @@ class SPINProblemBuilder:
 
     # ----------------------------------------------------------------------------------------------
     def _create_variational_problem(self) -> hl.PDEProblem:
+        """_summary_.
+
+        Raises:
+            ValueError: _description_
+            ValueError: _description_
+            NotImplementedError: _description_
+
+        Returns:
+            hl.PDEProblem: _description_
+        """
         function_space_list = (
             self._function_space_variables,
             self._function_space_parameters,
