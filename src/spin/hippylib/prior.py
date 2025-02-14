@@ -127,7 +127,7 @@ class SqrtPrecisionPDEPrior(hl.prior._Prior):  # noqa: SLF001
         Raises:
             ValueError: Checks if the mean vector has the same dimension as the function space.
         """
-        if not self.mean.size() == function_space.dim():
+        if not mean.size() == function_space.dim():
             raise ValueError(
                 f"The mean vector must have the same dimension ({self.mean.size()}) "
                 f"as the function space ({function_space.dim()})."

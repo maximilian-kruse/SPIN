@@ -44,7 +44,7 @@ class LowRankHessianSettings:
     num_eigenvalues: Annotated[int, Is[lambda x: x > 0]]
     num_oversampling: Annotated[int, Is[lambda x: x > 0]]
     inference_model: hl.Model
-    evaluation_point: tuple[
+    evaluation_point: Iterable[
         npt.NDArray[np.floating], npt.NDArray[np.floating], npt.NDArray[np.floating]
     ]
     gauss_newton_approximation: bool = False

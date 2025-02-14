@@ -6541,8 +6541,8 @@ packages:
   timestamp: 1693929424267
 - pypi: .
   name: spin
-  version: 0.1.dev110+g40e07ef.d20250214
-  sha256: aff56189c0988f9fee5ed8fe1947d5b4d608bdcdcd14d717c3e110f7dac8a653
+  version: 0.1.dev112+gf7272ba.d20250214
+  sha256: ea906d97b40cc7881e33719e81cfa9e99707a614b4fa9f9df9ad484af969888c
   requires_python: '>=3.12'
   editable: true
 - conda: https://conda.anaconda.org/conda-forge/noarch/stack_data-0.6.3-pyhd8ed1ab_1.conda
