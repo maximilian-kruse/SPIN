@@ -33,6 +33,7 @@ Functions:
         moments of the exit time.
     weak_form_fokker_planck: Weak form for the spatial contribution to the Fokker-Planck equation.
 """
+
 import dolfin as dl
 import ufl
 

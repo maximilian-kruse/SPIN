@@ -1,3 +1,5 @@
+"""_summary_."""
+
 from collections.abc import Iterable
 from dataclasses import dataclass
 from numbers import Real
@@ -18,6 +20,15 @@ from spin.fenics import converter as fex_converter
 def assemble_pointwise_observation_operator(
     function_space: dl.FunctionSpace, observation_points: npt.NDArray[np.floating]
 ) -> dl.Matrix:
+    """_summary_.
+
+    Args:
+        function_space (dl.FunctionSpace): _description_
+        observation_points (npt.NDArray[np.floating]): _description_
+
+    Returns:
+        dl.Matrix: _description_
+    """
     observation_matrix = hl.assemblePointwiseObservation(function_space, observation_points)
     return observation_matrix
 
@@ -325,7 +336,8 @@ class MisfitBuilder:
         return observation_matrices
 
     def _convert_matrices_to_scipy(
-        self, matrices: dl.Matrix | dl.PETScMatrix | Iterable[dl.Matrix | dl.PETScMatrix],
+        self,
+        matrices: dl.Matrix | dl.PETScMatrix | Iterable[dl.Matrix | dl.PETScMatrix],
     ) -> sp.sparse.coo_array | Iterable[sp.sparse.coo_array]:
         if self._num_components == 0:
             scipy_matrices = fex_converter.convert_matrix_to_scipy(matrices)

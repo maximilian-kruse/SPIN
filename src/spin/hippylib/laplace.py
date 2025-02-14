@@ -16,6 +16,7 @@ Classes:
     LowRankLaplaceApproximationSettings: Input for the low-rank Laplace approximation object.
     LowRankLaplaceApproximation: Wrapper for the low-rank Laplace approximation object.
 """
+
 from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Annotated
@@ -41,6 +42,7 @@ class LowRankLaplaceApproximationSettings:
         low_rank_hessian_eigenvectors (Iterable[npt.NDArray[np.floating]]): Eigenvectors for
             low-rank approximation of the negative log-posterior Hessian (at the MAP).
     """
+
     inference_model: hl.Model
     mean: np.ndarray
     low_rank_hessian_eigenvalues: npt.NDArray[np.floating]

@@ -8,8 +8,9 @@ precision matrix $\mathbf{R}$ and mean vector \bar{\mathbf{m}}, the discretized 
 reads
 
 $$
-    J_{\text{prior}}(\mathbf{,}) = \frac{1}{2} ||(\mathbf{m} - \bar{\mathbf{m}})||_\mathbf{R}^2.
+    J_{\text{prior}}(\mathbf{m}) = \frac{1}{2} ||(\mathbf{m} - \bar{\mathbf{m}})||_\mathbf{R}^2.
 $$
+
 The prior object provides methods for evaluating this functional, as well as its gradient and
 Hessian-vector products. In addition, we can draw samples from the distribution.
 We focus on a special class of priors with Matérn or Matérn-like covariance structure. We exploit
@@ -31,6 +32,7 @@ $$
 $$
 
 Lastly, to mitigate boundary effects, we can apply Robin boundary conditions to the prior field,
+
 $$
     \mathcal{R} = \gamma \nabla m \cdot \mathbf{n} + \frac{\sqrt{\delta\gamma}}{c} m,
     x\in\partial\Omega,
