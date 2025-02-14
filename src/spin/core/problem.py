@@ -1,4 +1,16 @@
-"""summary."""
+"""Setup of the PDE variational problem for stochastic process inference.
+
+This module implements the functionality of SPIN that is specific to stochastic processes. It sets
+up the Kolmogorov equations for PDE-based inference with Hippylib, as defined in the
+[`weakforms`][spin.core.weakforms] module. The builder pattern is employed to return a
+Hippylib-conformant object with additional data and methods for convenience. Different inference
+modes are available to infer drift, diffusion, or both. We do not actually consider the actual
+diffusion matrix, but the logarithm of its square. Inferring the square avoids disambiguity issues,
+Whereas infereing the log enforces positivity of the diffusion matrix. SPIN can only infer
+diagonal diffusion matrices, meaning that enforcing positiveness of the diagonal entries ensures
+that the diffusion matrix is s.p.d.
+"""
+
 import functools
 import warnings
 from collections.abc import Callable, Iterable
@@ -56,6 +68,7 @@ class SPINProblemSettings:
         initial_condition (str | Iterable[str] | None): Initial condition for PDE solver, only
             required for time-dependent PDE..
     """
+
     mesh: dl.Mesh
     pde_type: Annotated[
         str, Is[lambda pde: pde in ["mean_exit_time", "mean_exit_time_moments", "fokker_planck"]]
@@ -86,7 +99,7 @@ class PDEType:
     """Registration of PDEs, including weak form and metadata.
 
     This class is used by the builder internally, and does not require interaction by the user.
-    Only for development purpose, when a new PDE is implemented.
+    Only for development purposes, when a new PDE is implemented.
 
     Attributes:
         weak_form (Callable): Weak form in UFL syntax, defined in the
@@ -95,6 +108,7 @@ class PDEType:
         linear (bool): If the PDE is linear.
         stationary (bool): If the PDE is stationary..
     """
+
     weak_form: Callable[
         [ufl.Argument, ufl.Argument, ufl.Coefficient, ufl.tensors.ListTensor], ufl.Form
     ]
@@ -138,6 +152,7 @@ class SPINProblem:
         evaluate_gradient: Evaluate parametric gradient, given parameter, forward, and adjoint
             solution.
     """
+
     hippylib_variational_problem: hl.PDEProblem
     num_variable_components: Annotated[int, Is[lambda x: x > 0]]
     domain_dim: Annotated[int, Is[lambda x: x > 0]]
@@ -163,9 +178,17 @@ class SPINProblem:
         Args:
             parameter_array (npt.NDArray[np.floating]): Parameter function to solve PDE for.
 
+        Raises:
+            ValueError: Checks the parameter array has correct size.
+
         Returns:
             npt.NDArray[np.floating]: Forward solution of the PDE
         """
+        if not parameter_array.size == self.function_space_parameters.dim():
+            raise ValueError(
+                f"Parameter array has wrong size {parameter_array.size}, "
+                f"expected {self.function_space_parameters.dim()}"
+            )
         parameter_vector = fex_converter.convert_to_dolfin(
             parameter_array, self.function_space_parameters
         ).vector()
@@ -198,9 +221,27 @@ class SPINProblem:
             parameter_array (npt.NDArray[np.floating]): Parameter function.
             right_hand_side_array (npt.NDArray[np.floating]): Right-hand-side for the adjoint.
 
+        Raises:
+            ValueError: Checks that the array sizes of forward, parameter, and RHS are correct.
+
         Returns:
             npt.NDArray[np.floating]: Adjoint solution of the PDE problem
         """
+        if not forward_array.size == self.function_space_variables.dim():
+            raise ValueError(
+                f"Forward array has wrong size {forward_array.size}, "
+                f"expected {self.function_space_variables.dim()}"
+            )
+        if not parameter_array.size == self.function_space_parameters.dim():
+            raise ValueError(
+                f"Parameter array has wrong size {parameter_array.size}, "
+                f"expected {self.function_space_parameters.dim()}"
+            )
+        if not right_hand_side_array.size == self.function_space_variables.dim():
+            raise ValueError(
+                f"Right-hand-side array has wrong size {right_hand_side_array.size}, "
+                f"expected {self.function_space_variables.dim()}"
+            )
         forward_vector = fex_converter.convert_to_dolfin(
             forward_array, self.function_space_variables
         ).vector()
@@ -240,9 +281,27 @@ class SPINProblem:
             parameter_array (npt.NDArray[np.floating]): Parameter function
             adjoint_array (npt.NDArray[np.floating]): Adjoint solution
 
+        Raises:
+            ValueError: Checks that the array sizes of forward, parameter, and adjoint are correct.
+
         Returns:
             npt.NDArray[np.floating]: Parametric gradient
         """
+        if not forward_array.size == self.function_space_variables.dim():
+            raise ValueError(
+                f"Forward array has wrong size {forward_array.size}, "
+                f"expected {self.function_space_variables.dim()}"
+            )
+        if not parameter_array.size == self.function_space_parameters.dim():
+            raise ValueError(
+                f"Parameter array has wrong size {parameter_array.size}, "
+                f"expected {self.function_space_parameters.dim()}"
+            )
+        if not adjoint_array.size == self.function_space_variables.dim():
+            raise ValueError(
+                f"Adjoint array has wrong size {adjoint_array.size}, "
+                f"expected {self.function_space_variables.dim()}"
+            )
         forward_vector = fex_converter.convert_to_dolfin(
             forward_array, self.function_space_variables
         ).vector()
@@ -265,6 +324,9 @@ class SPINProblem:
 # ==================================================================================================
 class SPINProblemBuilder:
     """_summary_."""
+
+    # Registered PDE types with weak form and metadata
+    # Add newly implemented forms here
     _registered_pde_types: Final[dict[str, PDEType]] = {
         "mean_exit_time": PDEType(
             weak_form=weakforms.weak_form_mean_exit_time,
@@ -288,13 +350,14 @@ class SPINProblemBuilder:
 
     # ----------------------------------------------------------------------------------------------
     def __init__(self, settings: SPINProblemSettings) -> None:
-        """_summary_.
+        """Constructor, set all data structures internally for usage in `build` method.
 
         Args:
-            settings (SPINProblemSettings): _description_
+            settings (SPINProblemSettings): Configuration and data for the PDE variational problem.
 
         Raises:
-            ValueError: _description_
+            ValueError: Checks that given PDE type is registered with the builder in
+                `_registered_pde_types`.
         """
         try:
             self._pde_type = self._registered_pde_types[settings.pde_type]
@@ -333,7 +396,10 @@ class SPINProblemBuilder:
         """Main interface of the builder, returning a SPINProblem object.
 
         The builder internally cals a sequence of methods that result in a Hippylib `PDEProblem`
-        object to be used for inference.
+        object to be used for inference. The methods are implemented in a semi-explicit manner:
+        Function arguments are implicit, as they are set as class attributes in the constructor.
+        Output of the methods is explicit however. This is a compromise between clarity and
+        verbosity of the OOP design in this class.
 
         Returns:
             SPINProblem: Object wrapping the Hippylib `PDEProblem` with additional methods and
@@ -346,25 +412,31 @@ class SPINProblemBuilder:
             self._function_space_diffusion,
             self._function_space_composite,
         ) = self._create_function_spaces()
+
         # Compile available dolfin expressions
         (
             self._drift_function,
             self._log_squared_diffusion_function,
             self._initial_condition_function,
         ) = self._compile_expressions()
+
         # Convert given dolfin functions to arrays
         drift_array, log_squared_diffusion_array, initial_condition_array = (
             self._get_parameter_arrays()
         )
+
         # Get mesh coordinates
         coordinates_variables = fex_converter.get_coordinates(self._function_space_variables)
         coordinates_parameters = fex_converter.get_coordinates(self._function_space_drift)
+
         # Assemble weak form and boundary condition, depending on PDE type and inference mode
         self._function_space_parameters = self._assign_parameter_function_space()
         self._boundary_condition = self._create_boundary_condition()
         self._weak_form_wrapper = self._create_weak_form_wrapper()
+
         # Create a hippylip PDEProblem object
         variational_problem = self._create_variational_problem()
+
         # Return output as SPINProblem object
         spin_problem = SPINProblem(
             hippylib_variational_problem=variational_problem,
@@ -542,7 +614,21 @@ class SPINProblemBuilder:
     def _create_weak_form_wrapper(
         self,
     ) -> Callable[[Any, Any, Any], ufl.Form]:
+        """Generate generic weak form taking forward, parameter, and adjoint variable.
 
+        The implemented PDE forms in the [`weakforms`][spin.core.weakforms] explicitly take
+        drift and diffusion as coefficient functions. This method provides a wrapper that dispatches
+        to either drift, diffusion, or both as the parameter, depending on the inference mode.
+        The resultin form wrapper has the generic argument signature (forward, parameter, adjoint)
+        that is required for computations in Hippylib.
+
+        Raises:
+            ValueError: Checks that drift has been provided for "diffusion_only" inference.
+            ValueError: Checks that diffusion has been provided for "drift_only" inference.
+
+        Returns:
+            Callable[[Any, Any, Any], ufl.Form]: UFL weak form wrapper with generic signature
+        """
         # Drift only: Drift is parameter, diffusion needs to be given as coefficient function
         if self._inference_type == "drift_only":
             if self._log_squared_diffusion_function is None:
@@ -619,15 +705,23 @@ class SPINProblemBuilder:
 
     # ----------------------------------------------------------------------------------------------
     def _create_variational_problem(self) -> hl.PDEProblem:
-        """_summary_.
+        """Create the Hippylib-conformant `PDEProblem` object.
+
+        This method utilizes the previously assembled dolfin objects to create an object conforming
+        to the interface of the hippylib `PDEProblem` class through nominal subtyping. For
+        stationary problems. this is the `PDEVariationalProblem` class, for time-dependent problems,
+        we utilize the `TDPDELinearVariationalProblem` class in SPIN.
+
+        !!! warning
+            Time-dependent PDE inference is not yet implemented.
 
         Raises:
-            ValueError: _description_
-            ValueError: _description_
-            NotImplementedError: _description_
+            ValueError: Checks that time-stepping parameters are provided for time-dependent PDEs.
+            ValueError: Checks that initial condition is provided for time-dependent PDEs.
+            NotImplementedError: Indicates that time-dependent problems are not yet implemented.
 
         Returns:
-            hl.PDEProblem: _description_
+            hl.PDEProblem: Hippylib object for inference
         """
         function_space_list = (
             self._function_space_variables,
