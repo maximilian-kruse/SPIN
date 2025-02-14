@@ -2,10 +2,17 @@ r"""Hippylib Bilaplacian prior fields for vector-valued functions.
 
 This module implements Gaussian prior fields for non-parametric Bayesian inference with Hippylib.
 It extends the Hippylib `SqrtPrecisionPDEPrior` class to vector-valued fields, where the individual
-component fields are non-stationary, but statistically independent. For optimization-based
-inference, we define the negative log distribution of the prior as a cost functional. With a given
-precision matrix $\mathbf{R}$ and mean vector \bar{\mathbf{m}}, the discretized cost functional
-reads
+component fields are non-stationary, but statistically independent.
+We definee the prior for a component with a mean function $\bar{m}$ and a precision operator
+$\mathcal{R}$ as
+
+$$
+    \pi_{\text{prior}} = \mathcal{N}(\bar{m}, \mathcal{R}^{-1}),
+$$
+
+For optimization-based inference, we define the negative log distribution of the prior as a cost
+functional. With a given precision matrix $\mathbf{R}$ and mean vector \bar{\mathbf{m}},
+the discretized cost functional reads
 
 $$
     J_{\text{prior}}(\mathbf{m}) = \frac{1}{2} ||(\mathbf{m} - \bar{\mathbf{m}})||_\mathbf{R}^2.
@@ -39,6 +46,12 @@ $$
 $$
 
 with an empirically optimized constant $c=1.42$.
+
+Classes:
+    SqrtPrecisionPDEPrior: Re-implementation of Hippylib's `SqrtPrecisionPDEPrior` prior.
+    PriorSettings: Settings for the setup of a bilaplacian vector prior.
+    Prior: SPIN prior object, wrapping the Hippylib object with addiaional data and functionality.
+    BilaplacianVectorPriorBuilder: Builder for vector-valued Bilaplacian priors.
 """
 
 import math
