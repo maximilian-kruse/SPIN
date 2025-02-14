@@ -9,6 +9,12 @@ diffusion matrix, but the logarithm of its square. Inferring the square avoids d
 Whereas infereing the log enforces positivity of the diffusion matrix. SPIN can only infer
 diagonal diffusion matrices, meaning that enforcing positiveness of the diagonal entries ensures
 that the diffusion matrix is s.p.d.
+
+Classes:
+    SPINProblemSettings: Configuration and data for SPIN problem setup.
+    PDEType: Registration of PDEs, including weak form and metadata.
+    SPINProblem: Wrapper for Hippylib PDE problem with additional data and functionaliry.
+    SPINProblemBuilder: Builder for the SPINProblem object.
 """
 
 import functools
