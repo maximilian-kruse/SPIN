@@ -519,6 +519,11 @@ class Prior:
         Returns:
             npt.NDArray[np.floating]: Gradient array
         """
+        if not parameter_array.size == self.function_space.dim():
+            raise ValueError(
+                f"Parameter array must have the same dimension ({parameter_array.size}) "
+                f"as the function space ({self.function_space.dim()})."
+            )
         parameter_vector = fex_converter.convert_to_dolfin(
             parameter_array, self.function_space
         ).vector()
@@ -549,6 +554,19 @@ class BilaplacianVectorPriorBuilder:
         Args:
             prior_settings (PriorSettings): Configuration and data for the prior field.
         """
+        if (
+            not len(prior_settings.mean)
+            == len(prior_settings.variance)
+            == len(prior_settings.correlation_length)
+            == prior_settings.function_space.num_sub_spaces()
+        ):
+            raise ValueError(
+                f"Number of mean functions ({len(prior_settings.mean)}), "
+                f"variance functions ({len(prior_settings.variance)}), and "
+                f"correlation length functions ({len(prior_settings.correlation_length)}) "
+                f"must be equal to the number of function space components "
+                f"({prior_settings.function_space.num_sub_spaces()})."
+            )
         self._function_space = prior_settings.function_space
         self._num_components = self._function_space.num_sub_spaces()
         self._domain_dim = self._function_space.mesh().geometry().dim()
