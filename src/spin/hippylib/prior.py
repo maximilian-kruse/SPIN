@@ -1,4 +1,43 @@
-"""summary."""
+r"""Hippylib Bilaplacian prior fields for vector-valued functions.
+
+This module implements Gaussian prior fields for non-parametric Bayesian inference with Hippylib.
+It extends the Hippylib `SqrtPrecisionPDEPrior` class to vector-valued fields, where the individual
+component fields are non-stationary, but statistically independent. For optimization-based
+inference, we define the negative log distribution of the prior as a cost functional. With a given
+precision matrix $\mathbf{R}$ and mean vector \bar{\mathbf{m}}, the discretized cost functional
+reads
+
+$$
+    J_{\text{prior}}(\mathbf{,}) = \frac{1}{2} ||(\mathbf{m} - \bar{\mathbf{m}})||_\mathbf{R}^2.
+$$
+The prior object provides methods for evaluating this functional, as well as its gradient and
+Hessian-vector products. In addition, we can draw samples from the distribution.
+We focus on a special class of priors with Matérn or Matérn-like covariance structure. We exploit
+the correspondence between such fields and the solution of SPDEs with specific left-hand-side
+left-hand-side operators, as proposed [here](https://rss.onlinelibrary.wiley.com/doi/10.1111/j.1467-9868.2011.00777.x).
+This allows for the definition of a sparsite-promoting precision operator, in this case one
+reminiscent of a bilaplacian operator. For a domain $\Omega\subset\mathbb{R}^d$, we write
+
+$$
+    \mathcal{R} = \left(\delta - \gamma \Delta\right)^2, x\in\Omega,
+$$
+
+The parameters $\gamma$ and $\delta$ can be spatially varying, and have direct correspondence
+(neglecting boundary effects) to the variance and correlation length of the prior field,
+
+$$
+    \sigma^2 = \frac{\Gamma(\nu)}{(4\pi^{d/2})}\frac{1}{\delta^\nu\gamma^{d/2}},\quad
+    \rho = \sqrt{\frac{8\nu\gamma}{\delta}},\quad \nu = 2 - \frac{d}{2}.
+$$
+
+Lastly, to mitigate boundary effects, we can apply Robin boundary conditions to the prior field,
+$$
+    \mathcal{R} = \gamma \nabla m \cdot \mathbf{n} + \frac{\sqrt{\delta\gamma}}{c} m,
+    x\in\partial\Omega,
+$$
+
+with an empirically optimized constant $c=1.42$.
+"""
 
 import math
 from collections.abc import Callable, Iterable
@@ -359,11 +398,12 @@ class PriorSettings:
         robin_bc (bool): Whether to apply Robin boundary conditions. Defaults to False.
         robin_bc_const (Real): Constant for the Robin boundary condition. Defaults to 1.42.
     """
+
     function_space: dl.FunctionSpace
     mean: Iterable[str]
     variance: Iterable[str]
     correlation_length: Iterable[str]
-    anisotropy_tensor: Iterable[hl.ExpressionModule.AnisTensor2D] = None # type: ignore # noqa: PGH003
+    anisotropy_tensor: Iterable[hl.ExpressionModule.AnisTensor2D] = None  # type: ignore # noqa: PGH003
     cg_solver_relative_tolerance: Annotated[float, Is[lambda x: 0 < x < 1]] = 1e-12
     cg_solver_max_iter: Annotated[int, Is[lambda x: x > 0]] = 1000
     robin_bc: bool = False
@@ -389,10 +429,11 @@ class Prior:
     Methods:
         compute_variance_with_boundaries: Approximate the actual variance field with boundary
             effects.
-        compute_precision_with_boundaries: COmpute the  actual precision matrix with boundary
+        compute_precision_with_boundaries: Compute the actual precision matrix with boundary
             effects (only for testing and development).
         evaluate_gradient: Evaluate the parametric gradient of the prior cost functional.
     """
+
     hippylib_prior: hl.prior._Prior
     function_space: dl.FunctionSpace
     mean_array: npt.NDArray[np.floating]
@@ -487,14 +528,24 @@ class Prior:
 
 # ==================================================================================================
 class BilaplacianVectorPriorBuilder:
-    """Builder for vecto-valued Bilaplacian priors."""
+    """Builder for vector-valued Bilaplacian priors.
+
+    This builder assembles a vector-valued prior field, with bilaplacian-like precision operator.
+    It constructs component-wise variational forms and initializes an
+    [`SQRTPrecisionPDEPrior`][spin.hippylib.prior.SQRTPrecisionPDEPrior] object with the resulting
+    data. Different variance and correlation structures can be supplied for each component, but
+    the components themselves are statistically independent of each other.
+
+    Methods:
+        build: Main interface of the builder.
+    """
 
     # ----------------------------------------------------------------------------------------------
     def __init__(self, prior_settings: PriorSettings) -> None:
-        """_summary_.
+        """Constructor, internally initializes data structures.
 
         Args:
-            prior_settings (PriorSettings): _description_
+            prior_settings (PriorSettings): Configuration and data for the prior field.
         """
         self._function_space = prior_settings.function_space
         self._num_components = self._function_space.num_sub_spaces()
@@ -518,13 +569,17 @@ class BilaplacianVectorPriorBuilder:
 
     # ----------------------------------------------------------------------------------------------
     def build(self) -> Prior:
-        """_summary_.
+        """Main interface of the builder.
+
+        Returns a Prior wrapper object, containing the Hippylib prior object alongside additional
+        data and functionalities.
 
         Returns:
-            _type_: _description_
+            Prior: SPIN Prior object.
         """
         self._gamma, self._delta = self._convert_prior_coefficients()
 
+        # Define vctor variational form handler as sum over component forms
         def variational_form_handler(
             trial_function: ufl.Argument, test_function: ufl.Argument
         ) -> ufl.Form:
@@ -535,6 +590,7 @@ class BilaplacianVectorPriorBuilder:
             vector_form = sum(component_forms)
             return vector_form
 
+        # Initialize prior object
         prior_object = SqrtPrecisionPDEPrior(
             self._function_space,
             variational_form_handler,
@@ -542,6 +598,8 @@ class BilaplacianVectorPriorBuilder:
             self._cg_solver_relative_tolerance,
             self._cg_solver_max_iter,
         )
+
+        # Get other prior data in readable format
         mean_array = fex_converter.convert_to_numpy(self._mean, self._function_space)
         variance_array = fex_converter.convert_to_numpy(self._variance, self._function_space)
         correlation_length_array = fex_converter.convert_to_numpy(
@@ -549,6 +607,8 @@ class BilaplacianVectorPriorBuilder:
         )
         spde_matern_matrix = fex_converter.convert_matrix_to_scipy(prior_object._matern_sdpe_matrix)  # noqa: SLF001
         mass_matrix = fex_converter.convert_matrix_to_scipy(prior_object._mass_matrix)  # noqa: SLF001
+
+        # Return prior wrapper object
         prior = Prior(
             hippylib_prior=prior_object,
             function_space=self._function_space,
@@ -564,7 +624,7 @@ class BilaplacianVectorPriorBuilder:
     def _convert_prior_coefficients(self) -> tuple[dl.Function, dl.Function]:
         r"""Convert variance and correlation length fields to prior coefficients.
 
-        FOr the Bilaplacian prior, the variance $\sigma^2$ and correlation length $\rho$ can be
+        For the Bilaplacian prior, the variance $\sigma^2$ and correlation length $\rho$ can be
         converted to the prior SPDE parameters $\gamma$ and $\delta$ as
 
         $$
@@ -599,15 +659,28 @@ class BilaplacianVectorPriorBuilder:
     def _generate_scalar_form(
         self, trial_function: ufl.Argument, test_function: ufl.Argument, index: int
     ) -> ufl.Form:
-        """_summary_.
+        r"""Generate the compomnent-wise UFL form for the Bilaplacian prior.
+
+        The component form has three different components. Given a trial function $u$ and test
+        function $v$, this components are:
+
+        1. The mass matrix term, simply the discretization of $\int_{\Omega}\delta u v d\mathbf{x}$
+        2. The stiffness matrix term, discretizing
+            $\int_{\Omega}\gamma \nabla u \cdot \nabla v d\mathbf{x}$
+        3. The Robin boundary term, discretizing
+            $\int_{\partial\Omega} \frac{\sqrt{\delta\gamma}}{c} u v dx
+
+        The boundary term is only applied if Robin boundary conditions are set to true with a
+        boundary constant $c$. The stiffness matrix term can additionally contain an anisotropy
+        tensor, if the user provides one.
 
         Args:
-            trial_function (ufl.Argument): _description_
-            test_function (ufl.Argument): _description_
-            index (int): _description_
+            trial_function (ufl.Argument): FE Trial function.
+            test_function (ufl.Argument): FE Test function.
+            index (int): Index of the component being discretized in a vector context.
 
         Returns:
-            ufl.Form: _description_
+            ufl.Form: UFL form for the component-wise discretization.
         """
         trial_component = trial_function[index]
         test_component = test_function[index]
@@ -631,10 +704,8 @@ class BilaplacianVectorPriorBuilder:
             )
 
         if self._robin_bc:
-            robin_coeff = (
-                gamma_component
-                * ufl.sqrt(delta_component / gamma_component)
-                / dl.Constant(self._robin_bc_const)
+            robin_coeff = ufl.sqrt(delta_component * gamma_component) / dl.Constant(
+                self._robin_bc_const
             )
         else:
             robin_coeff = dl.Constant(0.0)
