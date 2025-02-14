@@ -1,3 +1,5 @@
+"""summary."""
+
 import math
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
@@ -17,6 +19,41 @@ from spin.fenics import converter as fex_converter
 
 # ==================================================================================================
 class SqrtPrecisionPDEPrior(hl.prior._Prior):  # noqa: SLF001
+    r"""Re-implementation of Hippylib's `SqrtPrecisionPDEPrior` prior.
+
+    This class is an almost one-to-one re-implementation of the `SqrtPrecisionPDEPrior` class from
+    Hippylib. It introduces some minor improvements to the original design, and, more importantly,
+    has better support for vector-valued prior fields.
+
+    On the component level, this class implements Gaussian prior fields, whose precision operator
+    is given as a bilaplacian-like operator, reading for a domain $\Omega\subset\mathbb{R}^d$:
+
+    $$
+        R_i= \big(\delta_i(x) - \gamma_I(x) \Delta\big)^2. \mathbf{x}\in\Omega,
+    $$
+    where the parameters $\delta_i(x)$ and $\gamma_i(x)$ can be spatially varying. Vector-valued
+    prior treat components as statistically independent, meaning that the precision is block-
+    structured.
+
+    According to the Hippylib `_Prior` nominal subtyping, this class has methods for evaluation of
+    the prior cost functional (the negative log distribution), its parametric gradient,
+    and the action of the Hessian (which is the precision operator). It further allows for sampling
+    from the prior field via a specialized, sparse Cholesky decomposition.
+
+    Attributes:
+        mean (dl.Vector | dl.PETScVector): Mean vector of the prior field (Hippylib interface)
+        M (dl.Matrix): Mass matrix of the prior field (Hippylib interface)
+        Msolver (dl.PETScKrylovSolver): Solver for the mass matrix (Hippylib interface)
+        R (hl.prior._BilaplacianR): Precision operator action of the prior field
+            (Hippylib interface)
+        Rsolver (hl.prior._BilaplacianRsolver): Covariance operator action of the prior field
+            (Hippylib interface)
+
+    Methods:
+        init_vector: Initialize a vector for prior computations
+        sample: Draw a sample from the prior field
+    """
+
     # ----------------------------------------------------------------------------------------------
     def __init__(
         self,
@@ -26,16 +63,51 @@ class SqrtPrecisionPDEPrior(hl.prior._Prior):  # noqa: SLF001
         cg_solver_relative_tolerance: Annotated[float, Is[lambda x: 0 < x < 1]] = 1e-12,
         cg_solver_max_iter: Annotated[int, Is[lambda x: x > 0]] = 1000,
     ) -> None:
+        """Constructor, building the prior internally.
+
+        The Prior works on vector function spaces, with the corresponding build-up in the
+        [`BiLaplacianVectorPriorBuilder`][spin.hippylib.prior.BiLaplacianVectorPriorBuilder] class.
+
+        Strictly speaking, the size of the constructor is a violation of good design principle,
+        in that this class is its own builder. However, we stick to this pattern according to the
+        Hippylib interface, and sub-divide the constructor into a sequence of smaller methods for
+        clarity.
+
+        Args:
+            function_space (dl.FunctionSpace): Scalar function space.
+            variational_form_handler (Callable[[ufl.Argument, ufl.Argument], ufl.Form]): variational
+                form describing the underlying prior field as an SPDE.
+            mean (dl.Vector | dl.PETScVector): Mean vector.
+            cg_solver_relative_tolerance (int, optional): Relative tolerance for CG solver for
+                matrix-free inversion. Defaults to 1e-12.
+            cg_solver_max_iter (int, optional): Maximum number of iterations for CG solver for
+                matrix-free inversion. Defaults to 1000.
+
+        Raises:
+            ValueError: Checks if the mean vector has the same dimension as the function space.
+        """
+        if not self.mean.size() == function_space.dim():
+            raise ValueError(
+                f"The mean vector must have the same dimension ({self.mean.size()}) "
+                f"as the function space ({function_space.dim()})."
+            )
+        # Set persistent variables
         self._function_space = function_space
         self._mean = mean
+
+        # Assemble mass matrix and bilaplace operator matrix
         trial_function = dl.TrialFunction(function_space)
         test_function = dl.TestFunction(function_space)
         self._mass_matrix, self._matern_sdpe_matrix = self._assemble_system_matrices(
             trial_function, test_function, variational_form_handler
         )
+
+        # Initialize solvers for inversion of mass matrix and bilaplace operator matrix
         self._mass_matrix_solver, self._matern_spde_matrix_solver = self._initialize_solvers(
             cg_solver_max_iter, cg_solver_relative_tolerance
         )
+
+        # Set up mass_matrix cholesky factor in quadrature space
         quadrature_degree = 2 * function_space.ufl_element().degree()
         representation_buffers = self._modify_quadrature_representation()
         quadrature_space, quadrature_trial_function, quadrature_test_function = (
@@ -48,22 +120,36 @@ class SqrtPrecisionPDEPrior(hl.prior._Prior):  # noqa: SLF001
             quadrature_test_function,
             test_function,
         )
+
+        # Set up wrappers for prior precision and covariance operators
         self._bilaplacian_precision_operator = hl.prior._BilaplacianR(  # noqa: SLF001
             self._matern_sdpe_matrix, self._mass_matrix_solver
         )
         self._bilaplacian_covariance_operator = hl.prior._BilaplacianRsolver(  # noqa: SLF001
             self._matern_spde_matrix_solver, self._mass_matrix
         )
+
+        # Restore setting and initialize hippylib interface
         self._restore_quadrature_representation(representation_buffers)
         self._set_up_hippylib_interface()
 
     # ----------------------------------------------------------------------------------------------
+    @staticmethod
     def _assemble_system_matrices(
-        self,
         trial_function: ufl.Argument,
         test_function: ufl.Argument,
         variational_form_handler: Callable,
     ) -> tuple[dl.Matrix, dl.Matrix]:
+        """Assemble the mass and bilaplacian operator matrix for the FEM system.
+
+        Args:
+            trial_function (ufl.Argument): FEM trial function.
+            test_function (ufl.Argument): FEM test function.
+            variational_form_handler (Callable): UFL form callable for the bilaplacian operator.
+
+        Returns:
+            tuple[dl.Matrix, dl.Matrix]: Mass and operator matrices.
+        """
         mass_matrix_term = ufl.inner(trial_function, test_function) * ufl.dx
         mass_matrix = dl.assemble(mass_matrix_term)
         matern_spde_term = variational_form_handler(trial_function, test_function)
@@ -74,6 +160,20 @@ class SqrtPrecisionPDEPrior(hl.prior._Prior):  # noqa: SLF001
     def _initialize_solvers(
         self, cg_solver_max_iter: int, cg_solver_relative_tolerance: Real
     ) -> tuple[dl.PETScKrylovSolver, dl.PETScKrylovSolver]:
+        """Initialize solvers for matrix-free inversion of the mass and bilalacian operator matrix.
+
+        Both matrices are inverted matrix-free using the CG method. For the mass matrix, we employ
+        a simple Jacobi preconditioner, while for the bilaplacian operator matrix, we use the
+        algebraic multigrid method.
+
+        Args:
+            cg_solver_max_iter (int): Maximum number of CG iterations.
+            cg_solver_relative_tolerance (Real): Relative tolerance for CG termination.
+
+        Returns:
+            tuple[dl.PETScKrylovSolver, dl.PETScKrylovSolver]: Initialized solver objects,
+                acting as application of the inverse matrices to vectors.
+        """
         mass_matrix_solver = hl.algorithms.PETScKrylovSolver(
             self._function_space.mesh().mpi_comm(), "cg", "jacobi"
         )
@@ -94,7 +194,15 @@ class SqrtPrecisionPDEPrior(hl.prior._Prior):  # noqa: SLF001
         return mass_matrix_solver, matern_spde_matrix_solver
 
     # ----------------------------------------------------------------------------------------------
-    def _modify_quadrature_representation(self) -> tuple[object, object]:
+    @staticmethod
+    def _modify_quadrature_representation() -> tuple[object, object]:
+        """Change UFL form representation for quadrature space.
+
+        The change in settings is utlized for the assembly of the mass matrix cholesky factor.
+
+        Returns:
+            tuple[object, object]: Buffers holding the default representation settings.
+        """
         quadrature_degree_buffer = dl.parameters["form_compiler"]["quadrature_degree"]
         representation_buffer = dl.parameters["form_compiler"]["representation"]
         dl.parameters["form_compiler"]["quadrature_degree"] = -1
@@ -102,9 +210,16 @@ class SqrtPrecisionPDEPrior(hl.prior._Prior):  # noqa: SLF001
         return quadrature_degree_buffer, representation_buffer
 
     # ----------------------------------------------------------------------------------------------
-    def _restore_quadrature_representation(
-        self, representation_buffers: tuple[object, object]
-    ) -> None:
+    @staticmethod
+    def _restore_quadrature_representation(representation_buffers: tuple[object, object]) -> None:
+        """Change UFL representation back to default.
+
+        Reverts effects of `_modify_quadrature_representation`.
+
+        Args:
+            representation_buffers (tuple[object, object]): Buffers holding the default
+                representation settings.
+        """
         quadrature_degree_buffer, representation_buffer = representation_buffers
         dl.parameters["form_compiler"]["quadrature_degree"] = quadrature_degree_buffer
         dl.parameters["form_compiler"]["representation"] = representation_buffer
@@ -113,6 +228,17 @@ class SqrtPrecisionPDEPrior(hl.prior._Prior):  # noqa: SLF001
     def _set_up_quadrature_space(
         self, quadrature_degree: int
     ) -> tuple[dl.FunctionSpace, ufl.Argument, ufl.Argument]:
+        """Set up quadrature space, trial and test function.
+
+        Used for the assembly of the mass matrix cholseky factor.
+
+        Args:
+            quadrature_degree (int): Degree of the quadrature representation.
+
+        Returns:
+            tuple[dl.FunctionSpace, ufl.Argument, ufl.Argument]: Quadrature space, trial and test
+                functions.
+        """
         quadrature_element = ufl.VectorElement(
             "Quadrature",
             self._function_space.mesh().ufl_cell(),
@@ -134,6 +260,23 @@ class SqrtPrecisionPDEPrior(hl.prior._Prior):  # noqa: SLF001
         quadrature_test_function: ufl.Argument,
         test_function: ufl.Argument,
     ) -> dl.Matrix:
+        """Assemble mass matrix Cholesky factor.
+
+        As in Hippylib, we provide a special form of the mass matrix decomposition for sampling
+        from the prior field. The decomposition is rectangular and sparse, based on the
+        quadrature space functionality in Fenics. For more details, we refer to the appendix of the
+        Hippylib [paper](https://dl.acm.org/doi/10.1145/3428447).
+
+        Args:
+            quadrature_degree (int): Degree of the quadrature representation.
+            quadrature_space (dl.FunctionSpace): Quadrature function space.
+            quadrature_trial_function (ufl.Argument): Quadrature space trial function.
+            quadrature_test_function (ufl.Argument): Quadrature space test function.
+            test_function (ufl.Argument): Test function on original space.
+
+        Returns:
+            dl.Matrix: Sparse Cholesky factor of the mass matrix
+        """
         quadrature_mass_matrix = dl.assemble(
             ufl.inner(quadrature_trial_function, quadrature_test_function)
             * ufl.dx(metadata={"quadrature_degree": quadrature_degree})
@@ -157,6 +300,7 @@ class SqrtPrecisionPDEPrior(hl.prior._Prior):  # noqa: SLF001
 
     # ----------------------------------------------------------------------------------------------
     def _set_up_hippylib_interface(self) -> None:
+        """Assign internal attributes to public properties, to adhere to Hippylib interface."""
         self.mean = self._mean
         self.M = self._mass_matrix
         self.Msolver = self._mass_matrix_solver
@@ -165,13 +309,28 @@ class SqrtPrecisionPDEPrior(hl.prior._Prior):  # noqa: SLF001
 
     # ----------------------------------------------------------------------------------------------
     def init_vector(self, vector_to_init: dl.Vector, matrix_dim: int | str) -> None:
+        """Initialize a vector to be used for prior computations.
+
+        Args:
+            vector_to_init (dl.Vector): Dolfin vector to initialize.
+            matrix_dim (int | str): Matrix "dimension" to initialize the vector for.
+        """
         if matrix_dim == "noise":
             self._mass_matrix_cholesky_Factor.init_vector(vector_to_init, 1)
         else:
             self._matern_sdpe_matrix.init_vector(vector_to_init, matrix_dim)
 
     # ----------------------------------------------------------------------------------------------
-    def sample(self, noise_vector: dl.Vector, matern_field_vector: dl.Vector, add_mean=True):
+    def sample(
+        self, noise_vector: dl.Vector, matern_field_vector: dl.Vector, add_mean: bool = True
+    ) -> None:
+        """Draw a sample from the prior field.
+
+        Args:
+            noise_vector (dl.Vector): Noise vector for the sample.
+            matern_field_vector (dl.Vector): Resulting sample vector.
+            add_mean (bool, optional): Whether to add prior mean vector to sample. Defaults to True.
+        """
         rhs = self._mass_matrix_cholesky_Factor * noise_vector
         self._matern_spde_matrix_solver.solve(matern_field_vector, rhs)
         if add_mean:
@@ -181,11 +340,30 @@ class SqrtPrecisionPDEPrior(hl.prior._Prior):  # noqa: SLF001
 # ==================================================================================================
 @dataclass
 class PriorSettings:
+    """Settings for the setup of a bilaplacian vector prior.
+
+    Attributes:
+        function_space (dl.FunctionSpace): Function space the prior is defined on.
+        mean (Iterable[str]): Mean functions, given as a sequence of strings in dolfin syntax, will
+            be compiled to dolfin expressions.
+        variance (Iterable[str]): Variance functions, given as a sequence of strings in dolfin
+            syntax, will be compiled to dolfin expressions.
+        correlation_length (Iterable[str]): Correlation length functions, given as a sequence of
+            strings in dolfin syntax, will be compiled to dolfin expressions.
+        anisotropy_tensor (Iterable[hl.ExpressionModule.AnisTensor2D], optional): Anisitropy tensor
+            for anisotropic covariance structure. Defaults to None.
+        cg_solver_relative_tolerance (Annotated[float, Is[lambda x: 0 < x < 1]]): Tolerance of CG
+            solver for matrix-free application of inverse operators. Defaults to 1e-12.
+        cg_solver_max_iter (Annotated[int, Is[lambda x: x > 0]]): Maximum iteration number of CG
+            solver for matrix-free application of inverse operators. Defaults to 1000.
+        robin_bc (bool): Whether to apply Robin boundary conditions. Defaults to False.
+        robin_bc_const (Real): Constant for the Robin boundary condition. Defaults to 1.42.
+    """
     function_space: dl.FunctionSpace
     mean: Iterable[str]
     variance: Iterable[str]
     correlation_length: Iterable[str]
-    anisotropy_tensor: Iterable[hl.ExpressionModule.AnisTensor2D] = None
+    anisotropy_tensor: Iterable[hl.ExpressionModule.AnisTensor2D] = None # type: ignore # noqa: PGH003
     cg_solver_relative_tolerance: Annotated[float, Is[lambda x: 0 < x < 1]] = 1e-12
     cg_solver_max_iter: Annotated[int, Is[lambda x: x > 0]] = 1000
     robin_bc: bool = False
@@ -195,6 +373,26 @@ class PriorSettings:
 # ==================================================================================================
 @dataclass
 class Prior:
+    """SPIN prior object, wrapping the Hippylib object with addiaional data and functionality.
+
+    Attributes:
+        hippylib_prior (hl.prior._Prior): Hippylib prior object
+        function_space (dl.FunctionSpace): Underlying function space
+        mean_array (npt.NDArray[np.floating]): Mean as numpy array
+        variance_array (npt.NDArray[np.floating]): Ideal pointwise variance (without boundary
+            effects) as numpy array
+        correlation_length_array (npt.NDArray[np.floating]): Ideal correlation length (without
+            boundary effects) as numpy array
+        spde_matern_matrix (sp.sparse.coo_array): Matern SPDE matrix in COO format
+        mass_matrix (sp.sparse.coo_array): Mass matrix in COO format
+
+    Methods:
+        compute_variance_with_boundaries: Approximate the actual variance field with boundary
+            effects.
+        compute_precision_with_boundaries: COmpute the  actual precision matrix with boundary
+            effects (only for testing and development).
+        evaluate_gradient: Evaluate the parametric gradient of the prior cost functional.
+    """
     hippylib_prior: hl.prior._Prior
     function_space: dl.FunctionSpace
     mean_array: npt.NDArray[np.floating]
@@ -206,20 +404,31 @@ class Prior:
     # ----------------------------------------------------------------------------------------------
     def compute_variance_with_boundaries(
         self,
-        method: Annotated[str, Is[lambda x: x in ("Exact", "Estimator", "Randomized")]],
-        num_expansion_values_estimator: Annotated[int, Is[lambda x: x > 0]] | None = None,
+        method: Annotated[str, Is[lambda x: x in ("Exact", "Randomized")]],
         num_eigenvalues_randomized: Annotated[int, Is[lambda x: x > 0]] | None = None,
     ) -> npt.NDArray[np.floating]:
+        """Compute the actual variance of the prior field.
+
+        Opposed to the prescribed, theoretical prior variance, this method evaluates the actual
+        variance for the discretized prior field on a bounded domain. The variance can be computed
+        exactly or approximated by a randomized method. The exact method should only be used for
+        small test problems. The randomized method is based on a truncated eigendecomposition of
+        the covariance matrix, and can therefore be used for larger problems.
+
+        Args:
+            method (str): Method for variance computation, either "Exact" or "Randomized".
+            num_eigenvalues_randomized (int, optional): Number of eigenvalues to use for
+                randomized diagonal estimation. Only necessary for option "Randomized".
+                Defaults to None.
+
+        Raises:
+            ValueError: Checks that a number of eigenvalues is provided for the "Randomized" method.
+
+        Returns:
+            npt.NDArray[np.floating]: Pointwise variance of the prior field..
+        """
         if method == "Exact":
             variance = self.hippylib_prior.pointwise_variance()
-        if method == "Estimator":
-            if num_expansion_values_estimator is None:
-                raise ValueError(
-                    "num_expansion_values_estimator must be provided for 'Estimator' method."
-                )
-            variance = self.hippylib_prior.pointwise_variance(
-                method=method, k=num_expansion_values_estimator
-            )
         if method == "Randomized":
             if num_eigenvalues_randomized is None:
                 raise ValueError(
@@ -233,6 +442,13 @@ class Prior:
 
     # ----------------------------------------------------------------------------------------------
     def compute_precision_with_boundaries(self) -> npt.NDArray[np.floating]:
+        """Compute the entire precision matrix of the prior field.
+
+        Should only be used for small test problems.
+
+        Returns:
+            npt.NDArray[np.floating]: Prior field precision matrix.
+        """
         matrix_rows = []
         for i in range(self.function_space.dim()):
             input_vector = dl.Vector()
@@ -251,6 +467,15 @@ class Prior:
     def evaluate_gradient(
         self, parameter_array: npt.NDArray[np.floating]
     ) -> npt.NDArray[np.floating]:
+        """Evaluate parametric gradient of the prior cost functional (negative log distribution).
+
+        Args:
+            parameter_array (npt.NDArray[np.floating]): Parameter value for which to compute the
+                gradient.
+
+        Returns:
+            npt.NDArray[np.floating]: Gradient array
+        """
         parameter_vector = fex_converter.convert_to_dolfin(
             parameter_array, self.function_space
         ).vector()
@@ -262,8 +487,15 @@ class Prior:
 
 # ==================================================================================================
 class BilaplacianVectorPriorBuilder:
+    """Builder for vecto-valued Bilaplacian priors."""
+
     # ----------------------------------------------------------------------------------------------
-    def __init__(self, prior_settings: PriorSettings):
+    def __init__(self, prior_settings: PriorSettings) -> None:
+        """_summary_.
+
+        Args:
+            prior_settings (PriorSettings): _description_
+        """
         self._function_space = prior_settings.function_space
         self._num_components = self._function_space.num_sub_spaces()
         self._domain_dim = self._function_space.mesh().geometry().dim()
@@ -285,7 +517,12 @@ class BilaplacianVectorPriorBuilder:
         self._delta = None
 
     # ----------------------------------------------------------------------------------------------
-    def build(self):
+    def build(self) -> Prior:
+        """_summary_.
+
+        Returns:
+            _type_: _description_
+        """
         self._gamma, self._delta = self._convert_prior_coefficients()
 
         def variational_form_handler(
@@ -325,6 +562,22 @@ class BilaplacianVectorPriorBuilder:
 
     # ----------------------------------------------------------------------------------------------
     def _convert_prior_coefficients(self) -> tuple[dl.Function, dl.Function]:
+        r"""Convert variance and correlation length fields to prior coefficients.
+
+        FOr the Bilaplacian prior, the variance $\sigma^2$ and correlation length $\rho$ can be
+        converted to the prior SPDE parameters $\gamma$ and $\delta$ as
+
+        $$
+        \begin{gather*}
+            \nu = 2- \frac{d}{2}, \quad \kappa = \frac{\sqrt{8\nu}}{\rho}, \\
+            s = \sigma \kappa^\nu \sqrt{\frac{4\pi^{d/2}}{\Gamma(\nu)}}, \\
+            \gamma = \frac{1}{s}, \quad \delta = \frac{\kappa^2}{s}.
+        \end{gather*}
+        $$
+
+        Returns:
+            tuple[dl.Function, dl.Function]: Coefficients $\gamma$ and $\delta$ for the prior field.
+        """
         variance_array = fex_converter.convert_to_numpy(self._variance, self._function_space)
         correlation_length_array = fex_converter.convert_to_numpy(
             self._correlation_length, self._function_space
@@ -346,6 +599,16 @@ class BilaplacianVectorPriorBuilder:
     def _generate_scalar_form(
         self, trial_function: ufl.Argument, test_function: ufl.Argument, index: int
     ) -> ufl.Form:
+        """_summary_.
+
+        Args:
+            trial_function (ufl.Argument): _description_
+            test_function (ufl.Argument): _description_
+            index (int): _description_
+
+        Returns:
+            ufl.Form: _description_
+        """
         trial_component = trial_function[index]
         test_component = test_function[index]
         gamma_component = self._gamma[index]

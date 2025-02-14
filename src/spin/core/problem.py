@@ -13,7 +13,7 @@ that the diffusion matrix is s.p.d.
 Classes:
     SPINProblemSettings: Configuration and data for SPIN problem setup.
     PDEType: Registration of PDEs, including weak form and metadata.
-    SPINProblem: Wrapper for Hippylib PDE problem with additional data and functionaliry.
+    SPINProblem: Wrapper for Hippylib PDE problem with additional data and functionality.
     SPINProblemBuilder: Builder for the SPINProblem object.
 """
 
@@ -112,7 +112,7 @@ class PDEType:
             [`weakforms`][spin.core.weakforms] module.
         num_components (int): Number of components of the solution/adjoint variable.
         linear (bool): If the PDE is linear.
-        stationary (bool): If the PDE is stationary..
+        stationary (bool): If the PDE is stationary.
     """
 
     weak_form: Callable[
@@ -188,7 +188,7 @@ class SPINProblem:
             ValueError: Checks the parameter array has correct size.
 
         Returns:
-            npt.NDArray[np.floating]: Forward solution of the PDE
+            npt.NDArray[np.floating]: Forward solution of the PDE.
         """
         if not parameter_array.size == self.function_space_parameters.dim():
             raise ValueError(
@@ -231,7 +231,7 @@ class SPINProblem:
             ValueError: Checks that the array sizes of forward, parameter, and RHS are correct.
 
         Returns:
-            npt.NDArray[np.floating]: Adjoint solution of the PDE problem
+            npt.NDArray[np.floating]: Adjoint solution of the PDE problem.
         """
         if not forward_array.size == self.function_space_variables.dim():
             raise ValueError(
@@ -283,15 +283,15 @@ class SPINProblem:
         the adjoint solution by calling the `solve_adjoint` method.
 
         Args:
-            forward_array (npt.NDArray[np.floating]): Forward solution
-            parameter_array (npt.NDArray[np.floating]): Parameter function
-            adjoint_array (npt.NDArray[np.floating]): Adjoint solution
+            forward_array (npt.NDArray[np.floating]): Forward solution.
+            parameter_array (npt.NDArray[np.floating]): Parameter function.
+            adjoint_array (npt.NDArray[np.floating]): Adjoint solution.
 
         Raises:
             ValueError: Checks that the array sizes of forward, parameter, and adjoint are correct.
 
         Returns:
-            npt.NDArray[np.floating]: Parametric gradient
+            npt.NDArray[np.floating]: Parametric gradient.
         """
         if not forward_array.size == self.function_space_variables.dim():
             raise ValueError(
@@ -409,7 +409,7 @@ class SPINProblemBuilder:
 
         Returns:
             SPINProblem: Object wrapping the Hippylib `PDEProblem` with additional methods and
-                metadata
+                metadata.
         """
         # Set up function spaces
         (
@@ -527,7 +527,7 @@ class SPINProblemBuilder:
         Returns:
             tuple[dl.Function | None, dl.Function | None, dl.Function | None]: Created dolfin
                 functions for drift, diffusion, and initial condition, if their string
-                representation has been provided
+                representation has been provided.
         """
         if self._drift is not None:
             drift_function = fex_converter.create_dolfin_function(
@@ -604,7 +604,7 @@ class SPINProblemBuilder:
         """Create homogeneous Dirichlet Boundary conditions on the given mesh.
 
         Returns:
-            dl.DirichletBC: Dolfin boundary conditions
+            dl.DirichletBC: Dolfin boundary conditions.
         """
         bc_value = (
             0.0 if self._pde_type.num_components == 1 else (0.0,) * self._pde_type.num_components
@@ -633,7 +633,7 @@ class SPINProblemBuilder:
             ValueError: Checks that diffusion has been provided for "drift_only" inference.
 
         Returns:
-            Callable[[Any, Any, Any], ufl.Form]: UFL weak form wrapper with generic signature
+            Callable[[Any, Any, Any], ufl.Form]: UFL weak form wrapper with generic signature.
         """
         # Drift only: Drift is parameter, diffusion needs to be given as coefficient function
         if self._inference_type == "drift_only":
@@ -702,7 +702,7 @@ class SPINProblemBuilder:
             matrix_diagonal (dl.Function | ufl.tensors.ListTensor): Diagonal entries
 
         Returns:
-            ufl.tensors.ListTensor: Diagonal matrix exponential
+            ufl.tensors.ListTensor: Diagonal matrix exponential.
         """
         diagonal_components = [ufl.exp(component) for component in matrix_diagonal]
         diagonal_components = ufl.as_vector(diagonal_components)
@@ -727,7 +727,7 @@ class SPINProblemBuilder:
             NotImplementedError: Indicates that time-dependent problems are not yet implemented.
 
         Returns:
-            hl.PDEProblem: Hippylib object for inference
+            hl.PDEProblem: Hippylib object for inference.
         """
         function_space_list = (
             self._function_space_variables,
