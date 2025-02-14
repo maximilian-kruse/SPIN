@@ -51,6 +51,12 @@ class LowRankLaplaceApproximationSettings:
 class LowRankLaplaceApproximation:
     """Low-rank Laplace approximation of the posterior distribution.
 
+    This class provides a wrapper for the `GaussianLRPosterior` object in Hippylib with a more
+    modern and user-friendly interface.
+
+    Attributes:
+        hippylib_gaussian_posterior (hl.GaussianLRPosterior): Underlying Hippylib
+
     Methods:
         compute_pointwise_variance: Compute the pointwise variance for the Laplace approximation.
     """
