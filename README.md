@@ -5,7 +5,7 @@
 
 # SPIN: Stochastic Process INference
 
-SPIN is a Python package for the non-parametric Bayesian inference of the parameter functions of autonomous diffusion processes. We consider processes $\mathbf{X}\_t $ on a domain $\Omega\in\mathbb{R}^d$, indexed over $t\in\mathbb{R}_{+}$. For a given drift vector $\mathbf{b}: \Omega\to\mathbb{R}^d$ and (quadratic) squared diffusion matrix $\mathbf{\Sigma}:\Omega\to\mathbb{R}^{d\times d}$, such processes can be described by an Ito SDE,
+SPIN is a Python package for the non-parametric Bayesian inference of the parameter functions of autonomous diffusion processes. We consider processes $\mathbf{X}_{t}$ on a domain $\Omega\in\mathbb{R}^d$, indexed over $t\in\mathbb{R}_{+}$. For a given drift vector $\mathbf{b}: \Omega\to\mathbb{R}^d$ and (quadratic) squared diffusion matrix $\mathbf{\Sigma}:\Omega\to\mathbb{R}^{d\times d}$, such processes can be described by an Ito SDE,
 
 $$
     d\mathbf{X}_t = \mathbf{b}(\mathbf{X}_t) dt + \sqrt{\mathbf{\Sigma}(\mathbf{X}_t)} d\mathbf{W}_t,\quad \mathbf{X}(t=0)=\mathbf{X}_0\ a.s.,
@@ -16,7 +16,7 @@ where $\mathbf{W}_t\in\mathbb{R}^d$ is a Wiener process.
 SPIN infers $\mathbf{b}(\mathbf{x})$ and $\mathbf{\Sigma}(\mathbf{x})$ as functions of states-space from trajectory statistics data. These statistics are either the PDF of the process $p(\mathbf{x},t)$, or the moments $\tau_n(\mathbf{x})$ of the distribution of first exit times from a bounded domain $\mathcal{A}$, defined as
 
 $$
-    \tau(x) \coloneqq\inf\{t\geq 0: \mathbf{X}_t\notin\mathcal{A}|\mathbf{X}_0=\mathbf{x}\},\quad \tau_n(\mathbf{x}) \coloneqq \mathbb{E}[\tau^n(\mathbf{x})].
+    \tau(x) \coloneqq\inf \{ t\geq 0: \mathbf{X}_t\notin\mathcal{A}|\mathbf{X}_0=\mathbf{x} \} ,\quad \tau_n(\mathbf{x}) \coloneqq \mathbb{E}[\tau^n(\mathbf{x})].
 $$
 
 The inference is governed by PDE models defined through the Kolmogorov equations. Given the infinitesimal generator $\mathcal{L}$ of the above process,
@@ -24,6 +24,7 @@ The inference is governed by PDE models defined through the Kolmogorov equations
 $$
     \mathcal{L} = \mathbf{b}(\mathbf{x})\cdot\nabla + \frac{1}{2}\mathbf{\Sigma}(\mathbf{x})\colon \nabla\nabla,
 $$
+
 the PDE of the process is governed by the Kolmogorov backward or Fokker-Planck equation,
 
 $$
