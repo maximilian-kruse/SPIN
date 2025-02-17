@@ -1,12 +1,12 @@
 r"""Conversion routines between Fenics and Numpy/Scipy.
 
 The underlying array representation of Fenics/dolfin vectors and matrices can sometimes be
-intransparent. To enforce a generic and consistent interface in SPIN, this module provides.
+intransparent. To enforce a generic and consistent interface in SPIN, this module provides
 bi-directional conversion routines between dolfin and Numpy/Scipy data structures. The structure of
 arrays not resembling coordinates is determined by the components of the underlying dolfin function
 space. For a vector with $K$ components and $N$ degrees of freedom (according to the underlying
 mesh), the resulting numpy array has shape $K\times N$. For coordinate arrays, the dimension of the
-domain is relevant. For a mesh with $N$ degrees of freedom, discretizing a domain od dimension $D$,
+domain is relevant. For a mesh with $N$ degrees of freedom, discretizing a domain of dimension $D$,
 the resulting array has shape $N\times D$.
 
 Functions:
@@ -231,7 +231,7 @@ def get_coordinates(
 ) -> npt.NDArray[np.floating]:
     r"""Get the coordinates of the mesh underlying a function space.
 
-    For vector spaces, the same coordinates are assumed by all components, so that only the
+    For vector spaces, the same coordinates are assumed for all components, so that only the
     coordinates of the first component are returned. For a mesh with $N$ vertices, in $D$
     dimensions, the resulting array has shape $N\times D$.
 
@@ -255,13 +255,13 @@ def extract_components(
     components: Iterable[dl.Vector | dl.PETScVector],
     function_space: dl.FunctionSpace,
 ) -> Iterable[dl.Vector | dl.PETScVector]:
-    """Extract components of a vector defined on a vector function space.
+    """Extract components of a dolfin vector defined on a vector function space.
 
     This method extracts the components of a vector defined on a vector function space and returns
     a list of scalar vectors defined on the respective subspaces. The vector function space needs
-    to be homogeneous, mixed spaces are not allowed.
+    to be homogeneous, mixed spaces are not supported.
 
-    !!! note "Inplace operation"
+    !!! note "In-place operation"
         This method modifies the components in-place, which have to be provided as input argument.
         No new memory is allocated.
 
@@ -304,7 +304,7 @@ def combine_components(
 ) -> dl.Vector | dl.PETScVector:
     """Combine a list of component vectors into a vector on a vector function space.
 
-    !!! note "Inplace operation"
+    !!! note "In-place operation"
         This method modifies the vector in-place, which has to be provided as input argument.
         No new memory is allocated.
 

@@ -3,12 +3,12 @@ r"""Weak form in UFL syntax for the Kolmogorov PDEs.
 This module implements the weak forms for the Kolmogorov equations, which describe the PDEs
 governing stochastic process inference in SPIN.
 For a domain $\Omega\subset\mathbb{R}^d$, drift vector $\mathbf{b}(\mathbf{x})$, and squared
-diffusion $\mathbf{\Sigma}(\mathbf{x})$, the Kolmogorov equations are base on the
+diffusion $\mathbf{\Sigma}(\mathbf{x})$, the Kolmogorov equations are based on the
 *infinitesimal Generator* of a process, defined as
 
 $$
     \mathcal{L} = \mathbf{b}(\mathbf{x})\cdot\nabla
-    + \frac{1}{2}\mathbf{\Sigma}(\mathbf{x})\colon\nabla\nabla
+    + \frac{1}{2}\mathbf{\Sigma}(\mathbf{x})\colon\nabla\nabla.
 $$
 
 In SPIN, we consider the Kolmogorov forward, as well as backward equation. The forward equation,
@@ -17,12 +17,13 @@ better known as Fokker-Planck equation, is defined in
 of the law or distribution $p: \Omega\times\mathbb{R}_+ \to \mathbb{R}_+$ of a process over space
 and time.
 On the other hand, the backward equation gives rise to a hierarchy of PDEs that governes the moments
-of the mean exit time or mean first passage time distribution of a process. The first passage time
+of the exit time or first passage time distribution of a process. The first passage time
 of a process $\mathbf{X}_t$ is defined as
 
 $$
     \tau(\mathbf{x}) = \inf\{t\geq 0: X_t\notin\Omega | \mathbf{X}_0 = \mathbf{x}\}.
 $$
+
 The respective weak forms are implemented in
 [`weak_form_mean_exit_time`][spin.core.weakforms.weak_form_mean_exit_time] and
 [`weak_form_mean_exit_time_moments`][spin.core.weakforms.weak_form_mean_exit_time_moments].
@@ -57,7 +58,7 @@ def weak_form_mean_exit_time(
     $$
 
     Forward and adjoint variables need to be defined on scalar function spaces, drift and diffusion
-    are a vector and matrix functions, respectively.
+    are vector and matrix functions, respectively.
 
     Args:
         forward_variable (ufl.Argument | dl.Function): Forward or trial variable
@@ -85,9 +86,9 @@ def weak_form_mean_exit_time_moments(
     drift: ufl.Coefficient | ufl.tensors.ListTensor,
     squared_diffusion: ufl.tensors.ListTensor,
 ) -> ufl.Form:
-    r"""UFL weak form for the PDE system yielding the first two moments of the exit time.
+    r"""UFL weak form for the PDE system yielding the first two exit time distribution moments.
 
-    Given the definitions above, the PDE reads
+    Given the definitions above, the PDEs read
 
     $$
     \begin{gather}
@@ -105,8 +106,9 @@ def weak_form_mean_exit_time_moments(
     \end{gather}
     $$
 
-    Forward and adjoint variables need to be defined on vector function spaces, drift and diffusion
-    are a vector and matrix functions, respectively.
+    Forward and adjoint variables need to be defined on vector function spaces for
+    $\tau = \text{vec}(\tau_1, \tau_2)$, drift and diffusion are a vector and matrix functions,
+    respectively.
 
     Args:
         forward_variable (ufl.Argument | dl.Function): Forward or trial variable
@@ -148,7 +150,7 @@ def weak_form_fokker_planck(
     $\mathcal{L}^*p$ of the time-dependent PDE
 
     $$
-        \frac{\partial p}{\partial t} = \mathcal{L}^*p, \quad, p(\mathbf{x},0) = p_0(\mathbf{x}),
+        \frac{\partial p}{\partial t} = \mathcal{L}^*p, \quad p(\mathbf{x},0) = p_0(\mathbf{x}),
     $$
 
     Args:
