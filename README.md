@@ -50,7 +50,7 @@ for PDEs](https://arxiv.org/abs/2411.02324)***
 
 ## Getting Started
 
-SPIN depends on a mixture of pip and conda dependencies, which can be efficiently managed using [Pixi](https://pixi.sh/latest/). To get started, simply run in the root directory
+SPIN depends on a mixture of pip and conda dependencies, which can be efficiently managed using [Pixi](https://pixi.sh/latest/). To set up a virtual environment in which SPIN can be run, simply execute in the project root directory:
 
 ```bash
 pixi install -e all
@@ -62,4 +62,4 @@ The [documentation](https://uqatkit.github.io/SPIN/) provides further informatio
 
 SPIN is being developed in the research group [Uncertainty Quantification](https://www.scc.kit.edu/forschung/uq.php) at KIT.
 Large portions of SPIN are based on the [hIPPYlib](https://dl.acm.org/doi/10.1145/3428447) software library for large-scale (Bayesian) inverse problems. hIPPYlib, in turn, uses [FEniCS](https://fenicsproject.org/) for finite element computations.
-It is distributed as free software under the [MIT License](https://choosealicense.com/licenses/mit/).
+SPIN is distributed as free software under the [MIT License](https://choosealicense.com/licenses/mit/).
