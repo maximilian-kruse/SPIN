@@ -1,3 +1,4 @@
+![Docs](https://img.shields.io/github/actions/workflow/status/UQatKIT/SPIN/docs.yaml?label=Docs)
 ![Python Version](https://img.shields.io/python/required-version-toml?tomlFilePath=https%3A%2F%2Fraw.githubusercontent.com%2FUQatKIT%2FSPIN%2Fmain%2Fpyproject.toml)
 ![License](https://img.shields.io/github/license/UQatKIT/SPIN)
 ![Beartype](https://github.com/beartype/beartype-assets/raw/main/badge/bear-ified.svg)
