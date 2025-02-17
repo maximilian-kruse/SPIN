@@ -552,10 +552,15 @@ class Misfit:
 
 # ==================================================================================================
 class MisfitBuilder:
-    """_summary_.
+    """Builder for misfit objects.
 
-    Returns:
-        _type_: _description_
+    THe builder takes a [`MisfitSettings`][spin.hippylib.misfit.MisfitSettings] object and builds a
+    misfit object according to the provided configuration. The builder distinguishes between
+    single-component and vector-valued function spaces, as well as stationary and time-dependent
+    misfits (time-dependent misfit are not yet implemented though!).
+
+    Methods:
+        build: Main interface to build a misfit object.
     """
 
     # ----------------------------------------------------------------------------------------------
