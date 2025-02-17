@@ -15,6 +15,7 @@ accompanying publication,
 :material-checkbox-marked-circle-outline: &nbsp; **Non-parametrix inference of drift and diffusion functions** <br>
 :material-checkbox-marked-circle-outline: &nbsp; **Works with stationary and time-dependent trajectory data** <br>
 :material-checkbox-marked-circle-outline: &nbsp; **PDE computations based on the finite element method** <br>
+:material-checkbox-marked-circle-outline: &nbsp; **Evaluation of the maximum a-posteriori estimate and Laplace approximation** <br>
 :material-checkbox-marked-circle-outline: &nbsp; **Generic and robust implementation, based on [hIPPYlib](https://dl.acm.org/doi/10.1145/3428447) and [FEniCS](https://fenicsproject.org/)**
 
 
