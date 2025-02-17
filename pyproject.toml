@@ -70,7 +70,8 @@ all = { features = ["dev", "docs", "style", "test"], solve-group = "default" }
 # --------------------------------------------------------------------------------------------------
 [tool.pixi.tasks]
 format = "ruff format"
-docs = "mkdocs serve"
+serve-docs = "mkdocs serve"
+build-docs = "mkdocs build"
 
 
 # --------------------------------------------------------------------------------------------------
