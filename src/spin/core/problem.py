@@ -4,11 +4,13 @@ This module implements the functionality of SPIN that is specific to stochastic 
 up the Kolmogorov equations for PDE-based inference with Hippylib, as defined in the
 [`weakforms`][spin.core.weakforms] module. The builder pattern is employed to return a
 Hippylib-conformant object with additional data and methods for convenience. Different inference
-modes are available to infer drift, diffusion, or both. We do not actually consider the actual
-diffusion matrix, but the logarithm of its square. Inferring the square avoids disambiguity issues,
-Whereas infereing the log enforces positivity of the diffusion matrix. SPIN can only infer
-diagonal diffusion matrices, meaning that enforcing positiveness of the diagonal entries ensures
-that the diffusion matrix is s.p.d.
+modes are available to infer drift, diffusion, or both.
+
+!!! info
+    We do not consider the actual diffusion matrix, but the logarithm of its square. Inferring the
+    square avoids disambiguity issues, whereas infereing the log enforces positivity of the
+    diffusion matrix. SPIN can only infer diagonal diffusion matrices, meaning that enforcing
+    positivity of the diagonal entries ensures that the diffusion matrix is s.p.d.
 
 Classes:
     SPINProblemSettings: Configuration and data for SPIN problem setup.

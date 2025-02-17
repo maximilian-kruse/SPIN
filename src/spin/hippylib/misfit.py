@@ -14,13 +14,16 @@ $$
 Therefore, we can define the likelihood density for a single variable component u as
 
 $$
-    \pi_{\text{like}} \propto \exp\left(-\frac{1}{2} \| \mathcal{B}u - d \|_{\Gamma^{-1}}^2\right).
+    \pi_{\text{like}}(d|u) \propto
+    \exp\left(-\frac{1}{2} \| \mathcal{B}u - d \|_{\Gamma^{-1}}^2\right).
 $$
 
-The below methods implements discrete versions of the projection operator and diagonal noise
-precision matrices with pointwise varying coefficients. The misfit functional is then given as
-the negative log-likelihood, along with gradients and Hessian-vector products of the misfit w.r.t.
-$u$.
+The below methods implements discrete versions of the projection operator, which we refer to as
+$\mathbf{B}$ and diagonal noise precision matrices $\Gamma^{-1}$ with pointwise varying
+coefficients. The misfit functional is then given as the negative log-likelihood. We further
+compute gradients and Hessian-vector products of the misfit w.r.t. $u$. The misfit functionality
+for a single component is implemented in the `DiscreteMisfit` class. Multiple misfit objects can
+be combined in the `VectorMisfit` wrapper.
 
 Classes:
     MisfitSettings: Dataclass to store settings for misfit construction.
@@ -105,7 +108,14 @@ def assemble_noise_precision_matrix(noise_variance: npt.NDArray[np.floating]) ->
 
 # ==================================================================================================
 class DiscreteMisfit(hl.Misfit):
-    """summary."""
+    """Implementation of a single-component misfit functional, as described above.
+
+    Methods:
+        cost: Evaluate the cost of the misfit functional.
+        grad: Compute the gradient of the misfit functional.
+        setLinearizationPoint: Set point for Hessian evaluation.
+        apply_ij: Apply Hessian-vector product.
+    """
 
     # ----------------------------------------------------------------------------------------------
     def __init__(
@@ -250,7 +260,24 @@ class DiscreteMisfit(hl.Misfit):
 
 # ==================================================================================================
 class VectorMisfit(hl.Misfit):
-    """Summary."""
+    """Misfit object for vector-valued functions.
+
+    The vector misfit is basically a wrapper to a collection of single-component misfiit objects,
+    i.e. the `DiscreteMisfit` class. For vector-valued quantities, it distributes computations for
+    cost, gradient, and Hessian-vector product to the individual components, and recombines the
+    results accordingly. This makes the vector misfit completely independent of the underlying
+    implementation for individual components.
+
+    !!! info
+        The only underlying assumption at the moment is that the different components are quadratic
+        forms of the forward variable $u$.
+
+    Methods:
+        cost: Evaluate the cost of the misfit functional.
+        grad: Compute the gradient of the misfit functional.
+        setLinearizationPoint: Set point for Hessian evaluation.
+        apply_ij: Apply Hessian-vector product.
+    """
 
     # ----------------------------------------------------------------------------------------------
     def __init__(self, misfit_list: Iterable[hl.Misfit], function_space: dl.FunctionSpace) -> None:
@@ -284,13 +311,17 @@ class VectorMisfit(hl.Misfit):
             dl.Vector | dl.PETScVector | None,
         ],
     ) -> float:
-        """_summary_.
+        """Evaluate the cost of the misfit functional.
+
+        The vector misfit wrapper computes the cost for each component individually and sums up
+        the contributions.
 
         Args:
-            state_list (Iterable): _description_
+            state_list (Iterable): List of forward, parameter and adjoint variables $(u,m,p)$,
+                only $u$ is required.
 
         Returns:
-            float: _description_
+            Real: Cost value for given state.
         """
         forward_vector, _, _ = state_list
         self._input_component_buffer = fex_converter.extract_components(
@@ -312,13 +343,18 @@ class VectorMisfit(hl.Misfit):
         ],
         output_vector: dl.Vector | dl.PETScVector,
     ) -> None:
-        """_summary_.
+        r"""Gradient of the cost functional given in the `cost` method.
+
+        The wrapper computes individual gradient components $g_i$ and assembles them into a vector
+        $\mathbf{g} = \text{vec}(g_i)$.
 
         Args:
-            derivative_type (Annotated[int, IsEqual[hl.STATE]  |  IsEqual[hl.PARAMETER]]):
-                _description_
-            state_list (Iterable): _description_
-            output_vector (dl.Vector | dl.PETScVector): _description_
+            derivative_type (Annotated[int, IsEqual[hl.STATE] | IsEqual[hl.PARAMETER]]): Variable
+                with respect to which the gradient is computed. Only `STATE` yields a non-zero
+                result.
+            state_list (Iterable): List of forward, parameter and adjoint variables $(u,m,p)$,
+                only $u$ is required.
+            output_vector (dl.Vector | dl.PETScVector): COmputed gradient.
         """
         forward_vector, _, _ = state_list
         self._input_component_buffer = fex_converter.extract_components(
@@ -344,7 +380,11 @@ class VectorMisfit(hl.Misfit):
         ],
         _gauss_newton_approx: bool,
     ) -> None:
-        """Summary."""
+        """Set point for Hessian evaluation.
+
+        This method does nothing, as the misfit is a quadratic form and its second variation is
+        thus constant. Only required for interface compatibility.
+        """
         pass
 
     # ----------------------------------------------------------------------------------------------
@@ -355,15 +395,22 @@ class VectorMisfit(hl.Misfit):
         hvp_direction: dl.Vector | dl.PETScVector,
         output_vector: dl.Vector | dl.PETScVector,
     ) -> None:
-        """_summary_.
+        """Apply Hessian vector-product.
+
+        Second derivatives are only computed with respect to the forward variable $u$. The vector
+        wrapper distributes the Hessian-vector product computation to the individual components and
+        recombines the results into a single vector.
 
         Args:
             first_derivative_type (Annotated[int, IsEqual[hl.STATE]  |  IsEqual[hl.PARAMETER]]):
-                _description_
+                Variable to compute first derivative with respect to. Only `STATE` yields a
+                non-zero result.
             second_derivative_type (Annotated[int, IsEqual[hl.STATE]  |  IsEqual[hl.PARAMETER]]):
-                _description_
-            hvp_direction (dl.Vector | dl.PETScVector): _description_
-            output_vector (dl.Vector | dl.PETScVector): _description_
+                Variable to compute second derivative with respect to. Only `STATE` yields a
+                non-zero result.
+            hvp_direction (dl.Vector | dl.PETScVector): Direction vector for which to compute
+                Hessian-vector product.
+            output_vector (dl.Vector | dl.PETScVector): Resulting vector.
         """
         if first_derivative_type == hl.STATE and second_derivative_type == hl.STATE:
             self._input_component_buffer = fex_converter.extract_components(
@@ -387,6 +434,7 @@ class VectorMisfit(hl.Misfit):
     def _create_buffers(
         function_space: dl.FunctionSpace,
     ) -> tuple[Iterable[dl.Vector], Iterable[dl.Vector]]:
+        """Create buffers for in-memory computations."""
         input_component_buffer = []
         output_component_buffer = []
         num_sub_spaces = function_space.num_sub_spaces()
@@ -419,12 +467,37 @@ class TDMisfit(hl.Misfit):
 # ==================================================================================================
 @dataclass
 class MisfitSettings:
-    """_summary_.
+    """Configuration and data for a misfit object.
+
+    Depending on the function space, the observation points, values, and noise variance given, the
+    [`MisfitBuilder`][spin.hippylib.misfit.MisfitBuilder] will assemble either a
+    [`DiscreteMisfit`][spin.hippylib.misfit.DiscreteMisfit] or a
+    [`VectorMisfit`][spin.hippylib.misfit.VectorMisfit] object.
+
+    !!! warning
+        Settings for time-dependent problems are only stubs,  time-dependent misfits are not
+        implemented yet.
+
+    Attributes:
+        function_space (dl.FunctionSpace): Function space of the forward variable. CAn be scalar
+            or vector-valued.
+        observation_points (npt.NDArray[np.floating] | Iterable[npt.NDArray[np.floating]]):
+            Points of observation to project to. Either single array or collection of arrays for
+            multiple components.
+        observation_values (npt.NDArray[np.floating] | Iterable[npt.NDArray[np.floating]] |
+            Iterable[Iterable[npt.NDArray[np.floating]]]): Observed data. Either single array or
+            collection of arrays for multiple components.
+        noise_variance (npt.NDArray[np.floating] | Iterable[npt.NDArray[np.floating]]):
+            Diagonal elements of the noise precision matrix. Either single array or
+            collection of arrays for multiple components.
+        stationary (bool): Whether the misfit is time-dependent.
+        observation_times (npt.NDArray[np.floating] | None): Observation times for time-dependent
+            misfit.
 
     Raises:
-        ValueError: _description_
-        ValueError: _description_
-        ValueError: _description_
+        ValueError: Checks that only single arrays are provided for scalar function spaces.
+        ValueError: Checks that the correct number of arrays is provided for vector function spaces.
+        ValueError: Checks that observations times are provided for time-dependent misfits.
     """
     function_space: dl.FunctionSpace
     observation_points: npt.NDArray[np.floating] | Iterable[npt.NDArray[np.floating]]
@@ -467,9 +540,10 @@ class MisfitSettings:
 # --------------------------------------------------------------------------------------------------
 @dataclass
 class Misfit:
-    """_summary_.
+    """Misfit object returned by the builder.
 
-    bla
+    Wraps the corresponding Hippylib object and scipy representations of the noise precision and
+    observation matrices.
     """
     hippylib_misfit: hl.Misfit
     noise_precision_matrix: sp.sparse.coo_array | Iterable[sp.sparse.coo_array]
@@ -486,10 +560,10 @@ class MisfitBuilder:
 
     # ----------------------------------------------------------------------------------------------
     def __init__(self, settings: MisfitSettings) -> None:
-        """_summary_.
+        """Constructor, set data structures from settings.
 
         Args:
-            settings (MisfitSettings): _description_
+            settings (MisfitSettings): Configuration object for the builder
         """
         self._function_space = settings.function_space
         self._observation_points = settings.observation_points
@@ -498,13 +572,17 @@ class MisfitBuilder:
         self._stationary = settings.stationary
         self._observation_times = settings.observation_times
         self._num_components = self._function_space.num_sub_spaces()
+        self._observation_matrices = None
+        self._noise_precision_matrices = None
 
     # ----------------------------------------------------------------------------------------------
     def build(self) -> Misfit:
-        """_summary_.
+        """Main interface of the builder.
+
+        Creates [`Misfit`][spin.hippylib.misfit.Misfit] object from settings.
 
         Returns:
-            Misfit: _description_
+            Misfit: SPIN misfit object wrapper.
         """
         self._observation_matrices = self._assemble_observation_matrices()
         self._noise_precision_matrices = self._assemble_noise_precision_matrices()
@@ -513,10 +591,15 @@ class MisfitBuilder:
 
     # ----------------------------------------------------------------------------------------------
     def _assemble_observation_matrices(self) -> dl.Matrix | list[dl.Matrix]:
-        """_summary_.
+        """Assemble observation matrices.
+
+        For a single component, this is just one matrix, for multiple components, it is a list of
+        matrices. Simply calls the
+        [`assemble_pointwise_observation_operator`][spin.hippylib.misfit.assemble_pointwise_observation_operator]
+        function.
 
         Returns:
-            dl.Matrix | list[dl.Matrix]: _description_
+            dl.Matrix | list[dl.Matrix]: Discretizes observation operator(s).
         """
         if self._num_components == 0:
             observation_matrices = assemble_pointwise_observation_operator(
@@ -531,34 +614,17 @@ class MisfitBuilder:
                 observation_matrices.append(component_observation_matrix)
         return observation_matrices
 
-    def _convert_matrices_to_scipy(
-        self,
-        matrices: dl.Matrix | dl.PETScMatrix | Iterable[dl.Matrix | dl.PETScMatrix],
-    ) -> sp.sparse.coo_array | Iterable[sp.sparse.coo_array]:
-        """_summary_.
-
-        Args:
-            matrices (dl.Matrix | dl.PETScMatrix | Iterable[dl.Matrix  |  dl.PETScMatrix]):
-                _description_
-
-        Returns:
-            sp.sparse.coo_array | Iterable[sp.sparse.coo_array]: _description_
-        """
-        if self._num_components == 0:
-            scipy_matrices = fex_converter.convert_matrix_to_scipy(matrices)
-        else:
-            scipy_matrices = []
-            for matrix in matrices:
-                scipy_matrix = fex_converter.convert_matrix_to_scipy(matrix)
-                scipy_matrices.append(scipy_matrix)
-        return scipy_matrices
-
     # ----------------------------------------------------------------------------------------------
     def _assemble_noise_precision_matrices(self) -> dl.PETScMatrix | list[dl.PETScMatrix]:
-        """_summary_.
+        """Assemble noise precision matrices.
+
+        For a single component, this is just one matrix, for multiple components, it is a list of
+        matrices. Simply calls the
+        [`assemble_noise_precision_matrix`][spin.hippylib.misfit.assemble_noise_precision_matrix]
+        function.
 
         Returns:
-            dl.PETScMatrix | list[dl.PETScMatrix]: _description_
+            dl.PETScMatrix | list[dl.PETScMatrix]: Noise precision matrix/matrices.
         """
         if self._num_components == 0:
             noise_precision_matrices = assemble_noise_precision_matrix(self._noise_variance)
@@ -573,10 +639,25 @@ class MisfitBuilder:
 
     # ----------------------------------------------------------------------------------------------
     def _build_misfit(self) -> Misfit:
-        """_summary_.
+        """Builds the misfit from the assembles noise precision and observation matrices.
+
+        The method distinguishes four different cases:
+
+        1. Single component, stationary: Assemble a single
+            [`DiscreteMisfit`][spin.hippylib.misfit.DiscreteMisfit] object.
+        2. Single component, time-dependent (**not implemented**): Assemble a single
+            [`DiscreteMisfit`][spin.hippylib.misfit.DiscreteMisfit] object. Use it as per-time-step
+            misfit in a time-dependent misfit object.
+        3. Multiple components, stationary: Assemble a list of
+            [`DiscreteMisfit`][spin.hippylib.misfit.DiscreteMisfit] objects and wrap them in a
+            [`VectorMisfit`][spin.hippylib.misfit.VectorMisfit] object.
+        4. Multiple components, time-dependent (**not implemented**): Assemble a list of
+            [`DiscreteMisfit`][spin.hippylib.misfit.DiscreteMisfit] objects and wrap them in a
+            [`VectorMisfit`][spin.hippylib.misfit.VectorMisfit] object. Use it as per-time-step
+            misfit in a time-dependent misfit object.
 
         Returns:
-            Misfit: _description_
+            Misfit: SPIN misfit object wrapper
         """
         # Single component, stationary
         if self._num_components == 0 and self._stationary:
@@ -631,3 +712,29 @@ class MisfitBuilder:
         observation_sparse = self._convert_matrices_to_scipy(self._observation_matrices)
         misfit = Misfit(hl_misfit, noise_precision_sparse, observation_sparse)
         return misfit
+
+    # ----------------------------------------------------------------------------------------------
+    def _convert_matrices_to_scipy(
+        self,
+        matrices: dl.Matrix | dl.PETScMatrix | Iterable[dl.Matrix | dl.PETScMatrix],
+    ) -> sp.sparse.coo_array | Iterable[sp.sparse.coo_array]:
+        """Convert sparse dolfin matrices to scipy COO arrays.
+
+        Uses the [`convert_matrix_to_scipy`][spin.fenics.converter.convert_matrix_to_scipy]
+        function in the Fenics converter module.
+
+        Args:
+            matrices (dl.Matrix | dl.PETScMatrix | Iterable[dl.Matrix  |  dl.PETScMatrix]):
+                Dolfin matrices to convert
+
+        Returns:
+            sp.sparse.coo_array | Iterable[sp.sparse.coo_array]: Resulting Scipy matrices
+        """
+        if self._num_components == 0:
+            scipy_matrices = fex_converter.convert_matrix_to_scipy(matrices)
+        else:
+            scipy_matrices = []
+            for matrix in matrices:
+                scipy_matrix = fex_converter.convert_matrix_to_scipy(matrix)
+                scipy_matrices.append(scipy_matrix)
+        return scipy_matrices
