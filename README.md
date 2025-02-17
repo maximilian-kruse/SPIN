@@ -44,7 +44,7 @@ SPIN utilizes the solution of above PDEs at a discrete number of given points as
 
 Further details regarding the theoretical background can be found in the accompanying publication,
 
-***[Non-parametric Inference for Diffusion Processes:
+>***[Non-parametric Inference for Diffusion Processes:
 A Computational Approach via Bayesian Inversion
 for PDEs](https://arxiv.org/abs/2411.02324)***
 
