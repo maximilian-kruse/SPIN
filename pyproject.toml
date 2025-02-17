@@ -72,6 +72,7 @@ all = { features = ["dev", "docs", "style", "test"], solve-group = "default" }
 format = "ruff format"
 serve-docs = "mkdocs serve"
 build-docs = "mkdocs build"
+changelog = "git-cliff"
 
 
 # --------------------------------------------------------------------------------------------------
