@@ -21,6 +21,13 @@ the stochastic process under consideration. For more information on the underlyi
 A Computational Approach via Bayesian Inversion
 for PDEs](https://arxiv.org/abs/2411.02324)**
 
+### Key Features
+- **Non-parametric inference of drift and diffusion functions**
+- **Works with stationary and time-dependent trajectory data**
+- **PDE computations based on the finite element method**
+- **Evaluation of the maximum a-posteriori estimate and Laplace approximation**
+- **Generic and robust implementation, based on [hIPPYlib](https://dl.acm.org/doi/10.1145/3428447) and [FEniCS](https://fenicsproject.org/)**
+
 ## Getting Started
 
 SPIN depends on a mixture of pip and conda dependencies, which can be efficiently managed using [Pixi](https://pixi.sh/latest/). To set up a virtual environment in which SPIN can be run, simply execute in the project root directory:

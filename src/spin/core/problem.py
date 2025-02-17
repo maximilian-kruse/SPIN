@@ -8,7 +8,7 @@ modes are available to infer drift, diffusion, or both.
 
 !!! info
     We do not consider the actual diffusion matrix, but the logarithm of its square. Inferring the
-    square avoids disambiguity issues, whereas infereing the log enforces positivity of the
+    square avoids disambiguity issues, whereas inferring the log enforces positivity of the
     diffusion matrix. SPIN can only infer diagonal diffusion matrices, meaning that enforcing
     positivity of the diagonal entries ensures that the diffusion matrix is s.p.d.
 
@@ -16,7 +16,7 @@ Classes:
     SPINProblemSettings: Configuration and data for SPIN problem setup.
     PDEType: Registration of PDEs, including weak form and metadata.
     SPINProblem: Wrapper for Hippylib PDE problem with additional data and functionality.
-    SPINProblemBuilder: Builder for the SPINProblem object.
+    SPINProblemBuilder: Builder for the `SPINProblem` object.
 """
 
 import functools
@@ -52,9 +52,9 @@ class SPINProblemSettings:
         mesh (dl.Mesh): Dolfin mesh as discretization of the PDE domain.
         pde_type (str): Identifier of the PDE to use, needs to be registered in the
             `_registered_pde_types` dictionary of the `SPINProblemBuilder` class. Available options
-            are "mean_exit_time", "mean_exit_time_moments", and "fokker_planck".
+            are "`mean_exit_time`", "`mean_exit_time_moments`", and "`fokker_planck`".
         inference_type (str): Type of inference, meaning which parameter(s) to infer. Available
-            options are "drift_only", "diffusion_only", and "drift_and_diffusion".
+            options are "`drift_only`", "`diffusion_only`", and "`drift_and_diffusion`".
         element_family_variables (str): FE Family for the forward and adjoint variable, according
             to options in UFL.
         element_family_parameters (str): FE Family for the parameter variable(s), according
@@ -68,7 +68,7 @@ class SPINProblemSettings:
             "diffusion_only" inference mode.
         log_squared_diffusion (str | Iterable[str] | None): String in dolfin syntax defining
             diagonal of the log squared diffusion function. Needs to be provided as list of length
-            corresponding to problem dimension. Only required for "drift_only" inference mode.
+            corresponding to problem dimension. Only required for "`drift_only`" inference mode.
         start_time (Real | None): Start time for PDE solver, only required for time-dependent PDE.
         end_time (Real | None): End time for PDE solver, only required for time-dependent PDE.
         num_steps (int | None): Number of time steps for PDE solver, only required for
@@ -106,8 +106,9 @@ class SPINProblemSettings:
 class PDEType:
     """Registration of PDEs, including weak form and metadata.
 
-    This class is used by the builder internally, and does not require interaction by the user.
-    Only for development purposes, when a new PDE is implemented.
+    !!! info
+        This class is used by the builder internally, and does not require interaction by the user.
+        Only for development purposes, when a new PDE is implemented.
 
     Attributes:
         weak_form (Callable): Weak form in UFL syntax, defined in the
@@ -214,15 +215,15 @@ class SPINProblem:
         parameter_array: npt.NDArray[np.floating],
         right_hand_side_array: npt.NDArray[np.floating],
     ) -> npt.NDArray[np.floating]:
-        r"""Solve the adjoint equation for the define PDE, given parameter and forward solution.
+        r"""Solve the adjoint equation for the defined PDE, given parameter and forward solution.
 
         The parameter can be drift, difusion, or both, depending on the inference mode. It has to be
         provided according to the convention defined in the fenics
         [`converter`][spin.fenics.converter] module. This means that the array has shape
         $K\times N$ for $k$ components and $N$ degrees of freedom on the computational domain.
         The forward solution can be obtained by calling the `solve_forward` method of this class.
-        Latly, the adjoint equation is solved with a given right hand side, which is typically
-        provided as the gradient of some loss functional governed by the PDE model
+        In addition, the adjoint equation is solved with a given right hand side, which is typically
+        provided as the gradient of some loss functional governed by the PDE model.
 
         Args:
             forward_array (npt.NDArray[np.floating]): Forward solution of the PDE.
@@ -275,7 +276,7 @@ class SPINProblem:
         parameter_array: npt.NDArray[np.floating],
         adjoint_array: npt.NDArray[np.floating],
     ) -> npt.NDArray[np.floating]:
-        r"""Evaluate the parametric gradient for parameter, forward, and adjoint solution.
+        r"""Evaluate the parametric gradient forgiven parameter, forward, and adjoint solution.
 
         The parameter can be drift, difusion, or both, depending on the inference mode. It has to be
         provided according to the convention defined in the fenics
@@ -331,7 +332,15 @@ class SPINProblem:
 
 # ==================================================================================================
 class SPINProblemBuilder:
-    """_summary_."""
+    """Spin problem builder.
+
+    The builder assembles a `SPINProblem` object from the configuration provided in a
+    `SPINProblemSettings` object. It casts problem-specific data structures into a
+    Hippylib-conformant interface.
+
+    Methods:
+        build: Main interface of the builder, returning a `SPINProblem` object.
+    """
 
     # Registered PDE types with weak form and metadata
     # Add newly implemented forms here
@@ -401,12 +410,12 @@ class SPINProblemBuilder:
 
     # ----------------------------------------------------------------------------------------------
     def build(self) -> SPINProblem:
-        """Main interface of the builder, returning a SPINProblem object.
+        """Main interface of the builder, returning a `SPINProblem` object.
 
         The builder internally cals a sequence of methods that result in a Hippylib `PDEProblem`
         object to be used for inference. The methods are implemented in a semi-explicit manner:
-        Function arguments are implicit, as they are set as class attributes in the constructor.
-        Output of the methods is explicit however. This is a compromise between clarity and
+        Function arguments are implicit, as they are set as object attributes in the constructor.
+        The output of the methods is explicit, however. This is a compromise between clarity and
         verbosity of the OOP design in this class.
 
         Returns:
@@ -468,9 +477,10 @@ class SPINProblemBuilder:
     ) -> tuple[dl.FunctionSpace, dl.FunctionSpace, dl.FunctionSpace, dl.FunctionSpace]:
         """Create function spaces for variables, drift, diffusion, and composite parameters.
 
-        The precise form of the function spaces depends on the PDE typ and inference mode.
-        For scalar PDEs, the solution and adjoint variable space is scalae, otherwise it is vector-
-        valued. The drift and diffusion spaces are always vector-valued, while the composite space
+        The precise form of the function spaces depends on the PDE type and inference mode.
+        For scalar PDEs, the solution and adjoint variable space is scalar, otherwise it is
+        vector-valued.
+        The drift and diffusion spaces are always vector-valued, while the composite space
         is a  vector space comprising both the drift and diffusion components.
 
         Returns:
@@ -524,7 +534,7 @@ class SPINProblemBuilder:
         """Generate dolfin expressions from strings, if they are provided.
 
         Depending on the inference mode, different expressions need to be provided. Their
-        existence is checked upon assemble of the PDE problem.
+        existence is checked upon assembly of the PDE problem.
 
         Returns:
             tuple[dl.Function | None, dl.Function | None, dl.Function | None]: Created dolfin
@@ -572,14 +582,13 @@ class SPINProblemBuilder:
     ) -> tuple[
         npt.NDArray[np.floating] | None,
         npt.NDArray[np.floating] | None,
-        tuple[npt.NDArray[np.floating]] | None,
+        npt.NDArray[np.floating] | None,
     ]:
         """Convert dolfin functions to numpy arrays, if they are provided by the user.
 
         Returns:
-            tuple[npt.NDArray[np.floating] | None, npt.NDArray[np.floating] | None,
-                tuple[npt.NDArray[np.floating]] | None]: Drift, diffusion, and initial condition
-                as numpy arrays, if provided by the user.
+            tuple[npt.NDArray | None, npt.NDArray | None, npt.NDArray | None]:
+                Drift, diffusion, and initial condition as numpy arrays, if provided by the user.
         """
         if self._drift_function is not None:
             drift_array = fex_converter.convert_to_numpy(
@@ -627,12 +636,12 @@ class SPINProblemBuilder:
         The implemented PDE forms in the [`weakforms`][spin.core.weakforms] explicitly take
         drift and diffusion as coefficient functions. This method provides a wrapper that dispatches
         to either drift, diffusion, or both as the parameter, depending on the inference mode.
-        The resultin form wrapper has the generic argument signature (forward, parameter, adjoint)
-        that is required for computations in Hippylib.
+        The resulting form wrapper has the generic argument signature
+        `(forward, parameter, adjoint)` that is required for computations in Hippylib.
 
         Raises:
-            ValueError: Checks that drift has been provided for "diffusion_only" inference.
-            ValueError: Checks that diffusion has been provided for "drift_only" inference.
+            ValueError: Checks that drift has been provided for "`diffusion_only`" inference.
+            ValueError: Checks that diffusion has been provided for "`drift_only`" inference.
 
         Returns:
             Callable[[Any, Any, Any], ufl.Form]: UFL weak form wrapper with generic signature.
@@ -721,7 +730,7 @@ class SPINProblemBuilder:
         we utilize the `TDPDELinearVariationalProblem` class in SPIN.
 
         !!! warning
-            Time-dependent PDE inference is not yet implemented.
+            Time-dependent PDE inference is not implemented yet.
 
         Raises:
             ValueError: Checks that time-stepping parameters are provided for time-dependent PDEs.
