@@ -6,58 +6,30 @@
 
 # SPIN: Stochastic Process INference
 
-SPIN is a Python package for the non-parametric Bayesian inference of the parameter functions of autonomous diffusion processes. We consider processes $\mathbf{X}$ on a domain $\Omega\in\mathbb{R}^d$, indexed over $t\in\mathbb{R} _+ $. For a given drift vector $\mathbf{b}: \Omega\to\mathbb{R}^d$ and (quadratic) squared diffusion matrix $\mathbf{\Sigma}:\Omega\to\mathbb{R}^{d\times d}$, such processes can be described by an Ito SDE,
+SPIN is a Python package for the non-parametric Bayesian inference of the parameter functions of autonomous diffusion processes.
+It can be used to infer the drift function $\mathbf{b}: \Omega\to\mathbb{R}^d$ and (squared) diffusion function $\mathbf{\Sigma}:\Omega\to\mathbb{R}^{d\times d}$ from trajectory data of an underlying process $\mathbf{X}$ on a domain $\Omega\in\mathbb{R}^d$, indexed over $t\in\mathbb{R} _+ $,
 
 $$
-    d\mathbf{X}_t = \mathbf{b}(\mathbf{X}_t) dt + \sqrt{\mathbf{\Sigma}(\mathbf{X}_t)} d\mathbf{W}_t,\quad \mathbf{X}(t=0)=\mathbf{X}_0\ a.s.,
+    d\mathbf{X}_t = \mathbf{b}(\mathbf{X}_t) dt + \sqrt{\mathbf{\Sigma}(\mathbf{X}_t)} d\mathbf{W}_t,\quad \mathbf{X}(t=0)=\mathbf{X}_0\ a.s.
 $$
 
-where $\mathbf{W}_t\in\mathbb{R}^d$ is a Wiener process.
+Under the hood, SPIN employs a PDE-based inference method, based on the **Kolmogorov equations** governing
+the stochastic process under consideration. For more information on the underlying theory, we refer to the
+**accompanying publication**,
 
-SPIN infers $\mathbf{b}(\mathbf{x})$ and $\mathbf{\Sigma}(\mathbf{x})$ as functions of states-space from trajectory statistics data. These statistics are either the PDF of the process $p(\mathbf{x},t)$, or the moments $\tau_n(\mathbf{x})$ of the distribution of first exit times from a bounded domain $\mathcal{A}$, defined as
-
-$$
-    \tau(x) \coloneqq\inf \\{ t\geq 0: \mathbf{X}_t\notin\mathcal{A}|\mathbf{X}_0=\mathbf{x} \\} ,\quad \tau_n(\mathbf{x}) \coloneqq \mathbb{E}[\tau^n(\mathbf{x})].
-$$
-
-The inference is governed by PDE models defined through the Kolmogorov equations. Given the infinitesimal generator $\mathcal{L}$ of the above process,
-
-$$
-    \mathcal{L} = \mathbf{b}(\mathbf{x})\cdot\nabla + \frac{1}{2}\mathbf{\Sigma}(\mathbf{x})\colon \nabla\nabla,
-$$
-
-the PDE of the process is governed by the Kolmogorov backward or Fokker-Planck equation,
-
-$$
-    \frac{\partial p}{\partial t}(\mathbf{x},t) = \mathcal{L}^*p(\mathbf{x},t),\quad p(\mathbf{x},t) = p_0(\mathbf{x}).
-$$
-
-On the other hand, the Kolomogorov forward equation gives rise to a hierarchy of stationary PDEs for the first passage time moments,
-
-$$
-\begin{gather*}
-    \mathcal{L}\tau_1 = -1,\ x\in\mathcal{A},\quad \tau_1 = 0,\ x\in\partial\mathcal{A}, \\
-    \mathcal{L}\tau_n = -n\tau_{n-1},\ x\in\mathcal{A},\quad \tau_n = 0,\ x\in\partial\mathcal{A}.
-\end{gather*}
-$$
-
-SPIN utilizes the solution of above PDEs at a discrete number of given points as a parameter-to-observable map $\mathcal{F}(\mathbf{m})$, which is then utilized in a function space Bayesian framework. The underlying discretization of the involved PDE problems is based on the finite element method.
-
-Further details regarding the theoretical background can be found in the accompanying publication,
-
->***[Non-parametric Inference for Diffusion Processes:
+>**[Non-parametric Inference for Diffusion Processes:
 A Computational Approach via Bayesian Inversion
-for PDEs](https://arxiv.org/abs/2411.02324)***
+for PDEs](https://arxiv.org/abs/2411.02324)**
 
 ## Getting Started
 
 SPIN depends on a mixture of pip and conda dependencies, which can be efficiently managed using [Pixi](https://pixi.sh/latest/). To set up a virtual environment in which SPIN can be run, simply execute in the project root directory:
 
 ```bash
-pixi install -e all
+pixi install
 ```
 
-The [documentation](https://uqatkit.github.io/SPIN/) provides further information regarding usage, theoretical background, technical setup and API. We further provide runnable notebooks under [`examples`](https://github.com/UQatKIT/SPIN/tree/main/examples).
+The [documentation](https://uqatkit.github.io/SPIN/) provides further information regarding usage, theoretical background, technical setup and API. We also provide runnable notebooks under [`examples`](https://github.com/UQatKIT/SPIN/tree/main/examples).
 
 ## Acknowledgement and License
 
