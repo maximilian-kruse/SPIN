@@ -120,7 +120,7 @@ class SqrtPrecisionPDEPrior(hl.prior._Prior):  # noqa: SLF001
         """Constructor, building the prior internally.
 
         The Prior works on vector function spaces, with the corresponding build-up in the
-        [`BiLaplacianVectorPriorBuilder`][spin.hippylib.prior.BiLaplacianVectorPriorBuilder] class.
+        [`BilaplacianVectorPriorBuilder`][spin.hippylib.prior.BilaplacianVectorPriorBuilder] class.
 
         Strictly speaking, the size of the constructor is a violation of good design principle,
         in that this class is its own builder. However, we stick to this pattern according to the
@@ -552,7 +552,7 @@ class BilaplacianVectorPriorBuilder:
 
     This builder assembles a vector-valued prior field, with bilaplacian-like precision operator.
     It constructs component-wise variational forms and initializes an
-    [`SQRTPrecisionPDEPrior`][spin.hippylib.prior.SQRTPrecisionPDEPrior] object with the resulting
+    [`SqrtPrecisionPDEPrior`][spin.hippylib.prior.SqrtPrecisionPDEPrior] object with the resulting
     data. Different variance and correlation structures can be supplied for each component, but
     the components themselves are statistically independent of each other.
 

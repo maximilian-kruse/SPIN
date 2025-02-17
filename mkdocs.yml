@@ -116,3 +116,15 @@ nav:
   - Usage:
       - Theory: usage/theory.md
       - Tutorial: usage/tutorial.md
+  - API Reference:
+      - Core:
+          - Problem Formulation: api/core/problem.md
+          - Weak Forms: api/core/weakforms.md
+      - Fenics:
+          - Converter: api/fenics/converter.md
+      - Hippylib:
+          - Prior: api/hippylib/prior.md
+          - Misfit: api/hippylib/misfit.md
+          - Optimization: api/hippylib/optimization.md
+          - Low-Rank Hessian: api/hippylib/hessian.md
+          - Laplace Approximation: api/hippylib/laplace.md

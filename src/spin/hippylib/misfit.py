@@ -484,9 +484,8 @@ class MisfitSettings:
         observation_points (npt.NDArray[np.floating] | Iterable[npt.NDArray[np.floating]]):
             Points of observation to project to. Either single array or collection of arrays for
             multiple components.
-        observation_values (npt.NDArray[np.floating] | Iterable[npt.NDArray[np.floating]] |
-            Iterable[Iterable[npt.NDArray[np.floating]]]): Observed data. Either single array or
-            collection of arrays for multiple components.
+        observation_values (npt.NDArray| Iterable[npt.NDArray] | Iterable[Iterable[npt.NDArray]]):
+            Observed data. Either single array or collection of arrays for multiple components.
         noise_variance (npt.NDArray[np.floating] | Iterable[npt.NDArray[np.floating]]):
             Diagonal elements of the noise precision matrix. Either single array or
             collection of arrays for multiple components.

@@ -149,7 +149,7 @@ class NewtonCGSolver:
             initial_guess (npt.NDArray[np.floating]): Initial guess for the optimization problem.
 
         Raises:
-            Checks if the initial guess has the correct size.
+            ValueError: Checks if the initial guess has the correct size.
 
         Returns:
             SolverResult: Optimal solution and metadata.

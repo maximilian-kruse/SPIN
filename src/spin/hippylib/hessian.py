@@ -35,8 +35,7 @@ class LowRankHessianSettings:
         num_eigenvalues (int): Number of eigenvalues to compute.
         num_oversampling (int): Number of oversampling eigenvalues (for numerical stability).
         inference_model (hl.Model): Hippylib inference model to use for computations.
-        evaluation_point
-            (tuple[npt.NDArray[np.floating], npt.NDArray[np.floating], npt.NDArray[np.floating]]):
+        evaluation_point (tuple[npt.NDArray, npt.NDArray, npt.NDArray]):
                 The evaluation point for the Hessian.
         gauss_newton_approximation: Whether to use the Gauss-Newton approximation.
     """
