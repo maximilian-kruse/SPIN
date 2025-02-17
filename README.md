@@ -5,7 +5,7 @@
 
 # SPIN: Stochastic Process INference
 
-SPIN is a Python package for the non-parametric Bayesian inference of the parameter functions of autonomous diffusion processes. We consider processes $ \mathbf{X}_t $ on a domain $\Omega\in\mathbb{R}^d$, indexed over $ t\in\mathbb{R}_+ $. For a given drift vector $\mathbf{b}: \Omega\to\mathbb{R}^d$ and (quadratic) squared diffusion matrix $\mathbf{\Sigma}:\Omega\to\mathbb{R}^{d\times d}$, such processes can be described by an Ito SDE,
+SPIN is a Python package for the non-parametric Bayesian inference of the parameter functions of autonomous diffusion processes. We consider processes $ \mathbf{X} _t $ on a domain $\Omega\in\mathbb{R}^d$, indexed over $ t\in\mathbb{R} _{+} $. For a given drift vector $\mathbf{b}: \Omega\to\mathbb{R}^d$ and (quadratic) squared diffusion matrix $\mathbf{\Sigma}:\Omega\to\mathbb{R}^{d\times d}$, such processes can be described by an Ito SDE,
 
 $$
     d\mathbf{X}_t = \mathbf{b}(\mathbf{X}_t) dt + \sqrt{\mathbf{\Sigma}(\mathbf{X}_t)} d\mathbf{W}_t,\quad \mathbf{X}(t=0)=\mathbf{X}_0\ a.s.,
