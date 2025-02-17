@@ -499,6 +499,7 @@ class MisfitSettings:
         ValueError: Checks that the correct number of arrays is provided for vector function spaces.
         ValueError: Checks that observations times are provided for time-dependent misfits.
     """
+
     function_space: dl.FunctionSpace
     observation_points: npt.NDArray[np.floating] | Iterable[npt.NDArray[np.floating]]
     observation_values: (
@@ -545,6 +546,7 @@ class Misfit:
     Wraps the corresponding Hippylib object and scipy representations of the noise precision and
     observation matrices.
     """
+
     hippylib_misfit: hl.Misfit
     noise_precision_matrix: sp.sparse.coo_array | Iterable[sp.sparse.coo_array]
     observation_matrix: sp.sparse.coo_array | Iterable[sp.sparse.coo_array]
