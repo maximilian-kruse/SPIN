@@ -62,19 +62,20 @@ def compute_low_rank_hessian(
         -\frac{1}{2}||\mathbf{F}(m)-\mathbf{d}_{obs}||_{R_{\text{noise}}}^2
         -\frac{1}{2}||\mathbf{m}-\mathbf{m}_{pr}||_{R_{\text{prior}}}^2\Big).
     $$
-    Conesquently, the Hessian can be divided into a misfit and a prior term,
+
+    Consequently, the Hessian can be divided into a misfit and a prior term,
 
     $$
         \mathbf{H}(\mathbf{m}) = \mathbf{H}_{\text{misfit}}(\mathbf{m}) + \mathbf{R}_{\text{prior}}
-        \in \mathbb{R}^{n\times n}.
+        \in \mathbb{R}^{N\times N}.
     $$
 
     To obtain an approximation of $\mathbf{H}$ at the point $\mathbf{m}$, we solve a generalized
-    eigenvalue problem for the first $r$ eigenvalues and eigenvectors of the Hessian,
+    eigenvalue problem for the first $r$ eigenvalues and eigenvectors of the misfit Hessian,
 
     $$
         \mathbf{H}_{\text{misfit}}\mathbf{v}_i = \lambda_i\mathbf{R}_{\text{prior}}\mathbf{v}_i,
-        \quad \lamba_1m \geq \ldots \geq \lambda_r.
+        \quad \lambda_1 \geq \ldots \geq \lambda_r.
     $$
 
     The low-rank approximation of the Hessian can then be constructed as
@@ -83,20 +84,20 @@ def compute_low_rank_hessian(
     \begin{gather*}
         \mathbf{H} = \mathbf{R}_{\text{prior}}
         + \mathbf{R}_{\text{prior}}\mathbf{V}_r\mathbf{D}_r\mathbf{V}_r^T\mathbf{R}_{\text{prior}}
-        + \mathcal{O}\big(\sum_{i=r+1}^n\lambda_i\big), \\
+        + \mathcal{O}\big(\sum_{i=r+1}^N\lambda_i\big), \\
         \mathbf{V}_r = [\mathbf{v}_1,\ldots,\mathbf{v}_r], \\
         \mathbf{D}_r = \text{diag}(\lambda_1,\ldots,\lambda_r).
     \end{gather*}
     $$
 
-    The inverse can then be appoximated with the Sherman-Morrison-Woodbury formula.
-    Apparently, the approximation is good if the trailing eigenvalues $\lambda_i, i=r+1,\ldots,n$
+    The inverse can be appoximated with the Sherman-Morrison-Woodbury formula.
+    Apparently, the approximation is good if the trailing eigenvalues $\lambda_i, i=r+1,\ldots,N$
     are small, corresponding to compactness of the Hessian operator.
 
     Args:
         settings (LowRankHessianSettings): Configuration for the low-rank computation
         evaluation_point (tuple[npt.NDArray, npt.NDArray, npt.NDArray]):
-                The evaluation point for the Hessian.
+            The evaluation point for the Hessian.
 
     Returns:
         tuple[npt.NDArray[np.floating], Iterable[npt.NDArray[np.floating]]]: Arrays for the
