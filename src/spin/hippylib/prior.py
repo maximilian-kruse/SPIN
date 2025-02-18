@@ -3,15 +3,15 @@ r"""Hippylib Bilaplacian prior fields for vector-valued functions.
 This module implements Gaussian prior fields for non-parametric Bayesian inference with Hippylib.
 It extends the Hippylib `SqrtPrecisionPDEPrior` class to vector-valued fields, where the individual
 component fields are non-stationary, but statistically independent.
-We definee the prior for a component with a mean function $\bar{m}$ and a precision operator
+We define the prior for a component with a mean function $\bar{m}$ and a precision operator
 $\mathcal{R}$ as
 
 $$
-    \pi_{\text{prior}} = \mathcal{N}(\bar{m}, \mathcal{R}^{-1}),
+    \pi_{\text{prior}} = \mathcal{N}(\bar{m}, \mathcal{R}^{-1}).
 $$
 
 For optimization-based inference, we define the negative log distribution of the prior as a cost
-functional. With a given precision matrix $\mathbf{R}$ and mean vector \bar{\mathbf{m}},
+functional. With a given precision matrix $\mathbf{R}$ and mean vector $\bar{\mathbf{m}}$,
 the discretized cost functional reads
 
 $$
@@ -19,15 +19,15 @@ $$
 $$
 
 The prior object provides methods for evaluating this functional, as well as its gradient and
-Hessian-vector products. In addition, we can draw samples from the distribution.
+Hessian-vector product. In addition, we can draw samples from the distribution.
 We focus on a special class of priors with Matérn or Matérn-like covariance structure. We exploit
-the correspondence between such fields and the solution of SPDEs with specific left-hand-side
+the correspondence between such fields and the solution of SPDEs with specific
 left-hand-side operators, as proposed [here](https://rss.onlinelibrary.wiley.com/doi/10.1111/j.1467-9868.2011.00777.x).
-This allows for the definition of a sparsite-promoting precision operator, in this case one
+This allows for the definition of a sparsity-promoting precision operator, in our case one
 reminiscent of a bilaplacian operator. For a domain $\Omega\subset\mathbb{R}^d$, we write
 
 $$
-    \mathcal{R} = \left(\delta - \gamma \Delta\right)^2, x\in\Omega,
+    \mathcal{R} = \left(\delta - \gamma \Delta\right)^2,\ x\in\Omega.
 $$
 
 The parameters $\gamma$ and $\delta$ can be spatially varying, and have direct correspondence
@@ -41,7 +41,7 @@ $$
 Lastly, to mitigate boundary effects, we can apply Robin boundary conditions to the prior field,
 
 $$
-    \mathcal{R} = \gamma \nabla m \cdot \mathbf{n} + \frac{\sqrt{\delta\gamma}}{c} m,
+    \mathcal{R} = \gamma \nabla m \cdot \mathbf{n} + \frac{\sqrt{\delta\gamma}}{c} m,\
     x\in\partial\Omega,
 $$
 
@@ -83,10 +83,11 @@ class SqrtPrecisionPDEPrior(hl.prior._Prior):  # noqa: SLF001
     is given as a bilaplacian-like operator, reading for a domain $\Omega\subset\mathbb{R}^d$:
 
     $$
-        R_i= \big(\delta_i(x) - \gamma_I(x) \Delta\big)^2. \mathbf{x}\in\Omega,
+        R_i= \big(\delta_i(x) - \gamma_I(x) \Delta\big)^2,\ \mathbf{x}\in\Omega,
     $$
+
     where the parameters $\delta_i(x)$ and $\gamma_i(x)$ can be spatially varying. Vector-valued
-    prior treat components as statistically independent, meaning that the precision is block-
+    priors treat components as statistically independent, meaning that the precision is block-
     structured.
 
     According to the Hippylib `_Prior` nominal subtyping, this class has methods for evaluation of
@@ -123,9 +124,9 @@ class SqrtPrecisionPDEPrior(hl.prior._Prior):  # noqa: SLF001
         [`BilaplacianVectorPriorBuilder`][spin.hippylib.prior.BilaplacianVectorPriorBuilder] class.
 
         Strictly speaking, the size of the constructor is a violation of good design principle,
-        in that this class is its own builder. However, we stick to this pattern according to the
-        Hippylib interface, and sub-divide the constructor into a sequence of smaller methods for
-        clarity.
+        in the sense that this class is its own builder. However, we stick to this pattern according
+        to the Hippylib interface, and sub-divide the constructor into a sequence of smaller methods
+        for clarity.
 
         Args:
             function_space (dl.FunctionSpace): Scalar function space.
@@ -214,7 +215,7 @@ class SqrtPrecisionPDEPrior(hl.prior._Prior):  # noqa: SLF001
     def _initialize_solvers(
         self, cg_solver_max_iter: int, cg_solver_relative_tolerance: Real
     ) -> tuple[dl.PETScKrylovSolver, dl.PETScKrylovSolver]:
-        """Initialize solvers for matrix-free inversion of the mass and bilalacian operator matrix.
+        """Initialize solvers for matrix-free inversion of the mass and bilaplacian operator matrix.
 
         Both matrices are inverted matrix-free using the CG method. For the mass matrix, we employ
         a simple Jacobi preconditioner, while for the bilaplacian operator matrix, we use the
@@ -406,9 +407,9 @@ class PriorSettings:
             strings in dolfin syntax, will be compiled to dolfin expressions.
         anisotropy_tensor (Iterable[hl.ExpressionModule.AnisTensor2D], optional): Anisitropy tensor
             for anisotropic covariance structure. Defaults to None.
-        cg_solver_relative_tolerance (Annotated[float, Is[lambda x: 0 < x < 1]]): Tolerance of CG
+        cg_solver_relative_tolerance (float): Tolerance of CG
             solver for matrix-free application of inverse operators. Defaults to 1e-12.
-        cg_solver_max_iter (Annotated[int, Is[lambda x: x > 0]]): Maximum iteration number of CG
+        cg_solver_max_iter (int): Maximum iteration number of CG
             solver for matrix-free application of inverse operators. Defaults to 1000.
         robin_bc (bool): Whether to apply Robin boundary conditions. Defaults to False.
         robin_bc_const (Real): Constant for the Robin boundary condition. Defaults to 1.42.
@@ -428,7 +429,7 @@ class PriorSettings:
 # ==================================================================================================
 @dataclass
 class Prior:
-    """SPIN prior object, wrapping the Hippylib object with addiaional data and functionality.
+    """SPIN prior object, wrapping the Hippylib object with additional data and functionality.
 
     Attributes:
         hippylib_prior (hl.prior._Prior): Hippylib prior object
@@ -694,14 +695,14 @@ class BilaplacianVectorPriorBuilder:
     ) -> ufl.Form:
         r"""Generate the compomnent-wise UFL form for the Bilaplacian prior.
 
-        The component form has three different components. Given a trial function $u$ and test
-        function $v$, this components are:
+        The component form has three different contributions. Given a trial function $u$ and test
+        function $v$, this contributions are:
 
         1. The mass matrix term, simply the discretization of $\int_{\Omega}\delta u v d\mathbf{x}$
         2. The stiffness matrix term, discretizing
             $\int_{\Omega}\gamma \nabla u \cdot \nabla v d\mathbf{x}$
         3. The Robin boundary term, discretizing
-            $\int_{\partial\Omega} \frac{\sqrt{\delta\gamma}}{c} u v dx
+            $\int_{\partial\Omega} \frac{\sqrt{\delta\gamma}}{c} u v dx$
 
         The boundary term is only applied if Robin boundary conditions are set to true with a
         boundary constant $c$. The stiffness matrix term can additionally contain an anisotropy
