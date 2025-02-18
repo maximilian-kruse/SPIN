@@ -2,21 +2,21 @@ r"""This module provides a modern wrapper to Hippylib's Newton-CG solver.
 
 Parametrization is done via data classes, all input and output vectors are numpy arrays.
 
-The provided inference Hippliyb inference model used for optimization is assumed to provide
+The input Hippliyb inference model used for optimization is assumed to provide
 a cost functional in form of a negative log-posterior. Thus, the optimal parameter value found by
-the optimizer approximizes the maximum a-posterior (MAP) estimate. In SPIN, we consider Gaussian
-prior and noise models, reesulting in an optimization problem of the form
+the optimizer approximizes the maximum a-posteriori (MAP) estimate. In SPIN, we consider Gaussian
+prior and noise models, resulting in an optimization problem of the form
 
 $$
     \mathbf{m}_{\text{MAP}} = \underset{\mathbf{m}}{\text{argmin}}\
     \frac{1}{2}||\mathbf{F}(m)-\mathbf{d}_{obs}||_{R_{\text{noise}}}^2
-    +\frac{1}{2}||\mathbf{m}-\mathbf{m}_{pr}||_{R_{\text{prior}}}^2\Big).
+    +\frac{1}{2}||\mathbf{m}-\mathbf{m}_{pr}||_{R_{\text{prior}}}^2.
 $$
 
 Classes:
     SolverSettings: Configuration of the Newton-CG solver.
     SolverResult: Data class for storage of solver results
-    NewtonCGSolver: Wrapper class for the in-exact Newton-CG solver implementation in Hippylib.
+    NewtonCGSolver: Wrapper class for the inexact Newton-CG solver implementation in Hippylib.
 """
 
 from dataclasses import dataclass
@@ -93,19 +93,19 @@ class SolverResult:
 
 # ==================================================================================================
 class NewtonCGSolver:
-    """Wrapper class for the in-exact Newton-CG solver implementation in Hippylib.
+    """Wrapper class for the inexact Newton-CG solver implementation in Hippylib.
 
     This class mainly exists to provide a more modern, convenient, and consistent interface to the
-    underlying hippylib functionality.
+    underlying Hippylib functionality.
     The incomplite Newton-CG method constitutes a combination of algorithms that efficienly solve
     large-scale optimization problems, with good scalability in terms of the number of degrees of
     freedom. The outer Newton iterations are known to converge independently of the problem size for
     a wide range of applications. The linear system at each Newton step is solved inexactly using
     the conjugate gradient (CG) method. The CG solver is terminated early according to Steihaug and
-    Eisenstat-Walker stopping criteria. This ensures termination independent ly of the problem size
+    Eisenstat-Walker stopping criteria. This ensures termination independently of the problem size
     as well. For globalization, armijo line search is utilized.
 
-    For more information on the implementation of the solver in hippylib,
+    For more information on the implementation of the Solver in hippylib,
     check out the
     [`NewtonCG`](https://hippylib.readthedocs.io/en/latest/hippylib.algorithms.html#module-hippylib.algorithms.NewtonCG)
     documentation.

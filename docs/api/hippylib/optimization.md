@@ -1,3 +1,3 @@
-# Incomplete Newton-CG Optimization
+# Inexact Newton-CG Optimization
 
 ::: spin.hippylib.optimization
