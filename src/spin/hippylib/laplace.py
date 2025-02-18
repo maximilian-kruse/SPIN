@@ -57,7 +57,7 @@ class LowRankLaplaceApproximation:
     modern and user-friendly interface.
 
     Attributes:
-        hippylib_gaussian_posterior (hl.GaussianLRPosterior): Underlying Hippylib
+        hippylib_gaussian_posterior (hl.GaussianLRPosterior): Underlying Hippylib object
 
     Methods:
         compute_pointwise_variance: Compute the pointwise variance for the Laplace approximation.
@@ -86,8 +86,7 @@ class LowRankLaplaceApproximation:
     # ----------------------------------------------------------------------------------------------
     def compute_pointwise_variance(
         self,
-        method: Annotated[str, Is[lambda x: x in ("Exact", "Estimator", "Randomized")]],
-        num_expansion_values_estimator: Annotated[int, Is[lambda x: x > 0]] | None = None,
+        method: Annotated[str, Is[lambda x: x in ("Exact", "Randomized")]],
         num_eigenvalues_randomized: Annotated[int, Is[lambda x: x > 0]] | None = None,
     ) -> npt.NDArray[np.floating]:
         """Compute the pointwise variance field of the laplace approximation.
@@ -98,15 +97,11 @@ class LowRankLaplaceApproximation:
 
         Args:
             method (str): Algorithm for computation of the variance, options are 'Exact',
-                'Estimator', and 'Randomized'.
-            num_expansion_values_estimator (int, optional): Number of expansion terms for the
-                estimator algorithm. Defaults to None.
+                and 'Randomized'.
             num_eigenvalues_randomized (int, optional): Number of dominant eigenvalues for the
                 randomized algorithm. Defaults to None.
 
         Raises:
-            ValueError: Checks that `num_expansion_values_estimator` is provided for the 'Estimator'
-                algorithm
             ValueError: Checks that `num_eigenvalues_randomized` is provided for the 'Randomized'
                 algorithm
 
@@ -114,15 +109,7 @@ class LowRankLaplaceApproximation:
             npt.NDArray[np.floating]: Pointwise variance field.
         """
         if method == "Exact":
-            variance = self._laplace_approximation.pointwise_variance()
-        if method == "Estimator":
-            if num_expansion_values_estimator is None:
-                raise ValueError(
-                    "num_expansion_values_estimator must be provided for 'Estimator' method."
-                )
-            variance = self._laplace_approximation.pointwise_variance(
-                method=method, k=num_expansion_values_estimator
-            )
+            variance = self._laplace_approximation.pointwise_variance(method=method)
         if method == "Randomized":
             if num_eigenvalues_randomized is None:
                 raise ValueError(
