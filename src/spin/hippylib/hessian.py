@@ -1,7 +1,7 @@
 """Wrapper for low-rank Hessian approximation in Hippylib.
 
-This moduleprovides a wrappe for the corresponding functionality in Hippylib. Configuration is done
-via dataclasses, all input and output vectors are numpy arrays.
+This module provides a wrapper for the corresponding functionality in Hippylib. Configuration is
+done via dataclasses, all input and output vectors are numpy arrays.
 
 Internally, the module uses the double-pass algorithm in Hippylib, to compute a randomized truncated
 SVD of the Hessian operator of the provided Hippylib inference model.
@@ -32,26 +32,24 @@ class LowRankHessianSettings:
     """Configuration for computation of the low-rank Hessian approximation.
 
     Attributes:
+        inference_model (hl.Model): Hippylib inference model to use for computations.
         num_eigenvalues (int): Number of eigenvalues to compute.
         num_oversampling (int): Number of oversampling eigenvalues (for numerical stability).
-        inference_model (hl.Model): Hippylib inference model to use for computations.
-        evaluation_point (tuple[npt.NDArray, npt.NDArray, npt.NDArray]):
-                The evaluation point for the Hessian.
         gauss_newton_approximation: Whether to use the Gauss-Newton approximation.
     """
 
     num_eigenvalues: Annotated[int, Is[lambda x: x > 0]]
     num_oversampling: Annotated[int, Is[lambda x: x > 0]]
     inference_model: hl.Model
-    evaluation_point: Iterable[
-        npt.NDArray[np.floating], npt.NDArray[np.floating], npt.NDArray[np.floating]
-    ]
     gauss_newton_approximation: bool = False
 
 
 # --------------------------------------------------------------------------------------------------
 def compute_low_rank_hessian(
     settings: LowRankHessianSettings,
+    evaluation_point: Iterable[
+        npt.NDArray[np.floating], npt.NDArray[np.floating], npt.NDArray[np.floating]
+    ],
 ) -> tuple[npt.NDArray[np.floating], Iterable[npt.NDArray[np.floating]]]:
     r"""Compute a low-rank Hessian approximation of the inference model posterior.
 
@@ -97,6 +95,8 @@ def compute_low_rank_hessian(
 
     Args:
         settings (LowRankHessianSettings): Configuration for the low-rank computation
+        evaluation_point (tuple[npt.NDArray, npt.NDArray, npt.NDArray]):
+                The evaluation point for the Hessian.
 
     Returns:
         tuple[npt.NDArray[np.floating], Iterable[npt.NDArray[np.floating]]]: Arrays for the
@@ -104,7 +104,7 @@ def compute_low_rank_hessian(
     """
     function_spaces = settings.inference_model.problem.Vh
     evaluation_point_vectors = []
-    for array, function_space in zip(settings.evaluation_point, function_spaces, strict=True):
+    for array, function_space in zip(evaluation_point, function_spaces, strict=True):
         evaluation_point_vectors.append(
             fex_converter.convert_to_dolfin(array, function_space).vector()
         )

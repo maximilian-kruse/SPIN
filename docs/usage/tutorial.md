@@ -155,19 +155,20 @@ Termination reason: Norm of the gradient less than tolerance
 
 ```py
 hessian_settings = hessian.LowRankHessianSettings(
+    inference_model=inference_model,
     num_eigenvalues=15,
     num_oversampling=5,
-    inference_model=inference_model,
-    evaluation_point=[
-        solver_solution.forward_solution,
-        solver_solution.optimal_parameter,
-        solver_solution.adjoint_solution,
-    ],
+    gauss_newton_approximation=False,
 )
+evaluation_point = [
+    solver_solution.forward_solution,
+    solver_solution.optimal_parameter,
+    solver_solution.adjoint_solution,
+]
 ```
 
 ```py
-eigenvalues, eigenvectors = hessian.compute_low_rank_hessian(hessian_settings)
+eigenvalues, eigenvectors = hessian.compute_low_rank_hessian(hessian_settings, evaluation_point)
 ```
 
 <figure markdown="span">
