@@ -2,6 +2,7 @@ repos:
   - repo: meta
     hooks:
       - id: check-useless-excludes
+      - id: check-hooks-apply
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
