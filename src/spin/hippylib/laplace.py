@@ -1,4 +1,4 @@
-"""Wrapper for the Gaussian low-rank posterior object in hippylib.
+"""Wrapper for the Gaussian low-rank posterior object in Hippylib.
 
 This module provides the functionality for the so-called Laplace approximation of the posterior,
 a method of variational inference. The Laplace approximation is based on the linearization of the
@@ -6,9 +6,10 @@ forward map that governs the inverse problem, typically about the MAP point. In 
 a Gaussian prior and likelihood, the Laplace approximation results in a Gaussian posterior, defined
 by a mean function (the MAP estimate), and the local Hessian at that point.
 
-The Laplace-approximation relies on the `GaussianLRPosterior` object in Hippylib, which takes a
-low-rank approximation of the Hessian as input. This low-rank approximation is computed in SPIN
-using the [`compute_low_rank_hessian`][spin.hippylib.hessian.compute_low_rank_hessian] function.
+The Laplace-approximation implemented in SPINrelies on the `GaussianLRPosterior` object in Hippylib,
+which takes a low-rank approximation of the Hessian as input. This low-rank approximation is
+computed in SPIN using the
+[`compute_low_rank_hessian`][spin.hippylib.hessian.compute_low_rank_hessian] function.
 The MAP can be found using the Newton-CG solver in Hippylib, which is wrapped in the
 [`NewtonCGSolver`][spin.hippylib.optimization.NewtonCGSolver] class for SPIN applications.
 
@@ -89,15 +90,15 @@ class LowRankLaplaceApproximation:
         method: Annotated[str, Is[lambda x: x in ("Exact", "Randomized")]],
         num_eigenvalues_randomized: Annotated[int, Is[lambda x: x > 0]] | None = None,
     ) -> npt.NDArray[np.floating]:
-        """Compute the pointwise variance field of the laplace approximation.
+        """Compute the pointwise variance field of the Laplace approximation.
 
         For a detailed description of the different methods, we refer to the documentation of the
         [`GaussianLRPosterior`](https://hippylib.readthedocs.io/en/latest/hippylib.modeling.html?highlight=posterior#hippylib.modeling.posterior.GaussianLRPosterior)
         object in Hippylib.
 
         Args:
-            method (str): Algorithm for computation of the variance, options are 'Exact',
-                and 'Randomized'.
+            method (str): Algorithm for computation of the variance, options are "`Exact`",
+                and "`Randomized`".
             num_eigenvalues_randomized (int, optional): Number of dominant eigenvalues for the
                 randomized algorithm. Defaults to None.
 

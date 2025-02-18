@@ -472,7 +472,7 @@ class Prior:
         the covariance matrix, and can therefore be used for larger problems.
 
         Args:
-            method (str): Method for variance computation, either "Exact" or "Randomized".
+            method (str): Method for variance computation, either "`Exact`" or "`Randomized`".
             num_eigenvalues_randomized (int, optional): Number of eigenvalues to use for
                 randomized diagonal estimation. Only necessary for option "Randomized".
                 Defaults to None.
