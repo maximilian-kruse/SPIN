@@ -4,8 +4,8 @@ This module implements the likelihood for Bayesian inverse problems in the Hippy
 In the optimization context, it can be interpreted as a misfit functional. We focus on additive,
 zero-centered Gaussian noise models. Given a PDE solution operator
 $\mathcal{G}(\mathbf{m}) = \mathbf{u}$, we define for each output component $u$ the projection to
-points of observation $u_d = \mathcal{B}u in \mathbb{R}^q$ with observation operator
-$\mathcal{B}: \mathcal{U} \to \mathbb{R}^q$. We then write for the data $d$ that
+points of observation $u_d = \mathcal{B}u \in \mathbb{R}^q$ with observation operator
+$\mathcal{B}: \mathcal{U} \to \mathbb{R}^q$. We then write for the component data $d$ that
 
 $$
     d = u_d + \eta, \quad \eta \sim \mathcal{N}(0, \Gamma).
@@ -18,10 +18,10 @@ $$
     \exp\left(-\frac{1}{2} \| \mathcal{B}u - d \|_{\Gamma^{-1}}^2\right).
 $$
 
-The below methods implements discrete versions of the projection operator, which we refer to as
-$\mathbf{B}$ and diagonal noise precision matrices $\Gamma^{-1}$ with pointwise varying
+The below methods implement discrete versions of the projection operator, which we refer to as
+$\mathbf{B}$, and a diagonal noise precision matrix $\Gamma^{-1}$ with pointwise varying
 coefficients. The misfit functional is then given as the negative log-likelihood. We further
-compute gradients and Hessian-vector products of the misfit w.r.t. $u$. The misfit functionality
+compute gradients and Hessian-vector products of the misfit w.r.t. $u$. The misfit functional
 for a single component is implemented in the `DiscreteMisfit` class. Multiple misfit objects can
 be combined in the `VectorMisfit` wrapper.
 
@@ -32,6 +32,10 @@ Classes:
     TDMisfit: Misfit class for time-dependent misfit problems (not implemented yet).
     Misfit: Dataclass to store assembled misfit objects.
     MisfitBuilder: Builder class to assemble misfit objects from settings.
+
+Functions:
+    assemble_pointwise_observation_operator: Assemble pointwise observation operator.
+    assemble_noise_precision_matrix: Assemble noise precision matrix.
 """
 
 from collections.abc import Iterable
@@ -58,9 +62,9 @@ def assemble_pointwise_observation_operator(
 
     This is a simple PEP8-conformant wrapper to Hippylibs `assemblePointwiseObservation` function.
     The function takes an input function space and points of observation, to which a function
-    shalle be projected. Supports multidimensional domains. In a $d$-dimensional domain with $q_d$
+    shall be projected. Supports multidimensional domains. In a $d$-dimensional domain with $q_d$
     observation points per dimension, the `observation_points` array should have shape
-    $q_d\timed d$. The resulting projection matrix $\mathbf{B}$ has shape $q_d d \times N$,
+    $q_d\times d$. The resulting projection matrix $\mathbf{B}$ has shape $q_d d \times N$,
     where $N$ is the number of degrees of freedom in the function space.
 
     !!! warning
@@ -86,7 +90,7 @@ def assemble_noise_precision_matrix(noise_variance: npt.NDArray[np.floating]) ->
     and the resulting precision matrix $\Gamma^{-1}$ will have shape $q \times q$.
 
     !!! warning
-        The precision matric works only component-wise, on scalar function spaces.
+        The precision matrix works only component-wise, on scalar function spaces.
 
     Args:
         noise_variance (npt.NDArray[np.floating]): Diagonal elements of the precision matrix.
@@ -153,11 +157,11 @@ class DiscreteMisfit(hl.Misfit):
     ) -> Real:
         r"""Evaluate the cost of the misfit functional.
 
-        For a given state $u$, data, $d$, projection operator $B$ and noise precision $\Gamma^{-1}$,
-        the cost is given as
+        For a given state $u$, data $d$, projection matrix $\mathbf{B}$ and noise precision
+        $\Gamma^{-1}$, the cost is given as
 
         $$
-            J_{\text{misfit}}(u) = \frac{1}{2} \| B u - d \|_{\Gamma^{-1}}^2.
+            J_{\text{misfit}}(u) = \frac{1}{2} \| \mathbf{B} u - d \|_{\Gamma^{-1}}^2.
         $$
 
         Args:
@@ -193,7 +197,7 @@ class DiscreteMisfit(hl.Misfit):
                 result.
             state_list (Iterable): List of forward, parameter and adjoint variables $(u,m,p)$,
                 only $u$ is required.
-            output_vector (dl.Vector | dl.PETScVector): COmputed gradient.
+            output_vector (dl.Vector | dl.PETScVector): Computed gradient.
         """
         if derivative_type == hl.STATE:
             forward_vector = state_list[hl.STATE]
@@ -354,7 +358,7 @@ class VectorMisfit(hl.Misfit):
                 result.
             state_list (Iterable): List of forward, parameter and adjoint variables $(u,m,p)$,
                 only $u$ is required.
-            output_vector (dl.Vector | dl.PETScVector): COmputed gradient.
+            output_vector (dl.Vector | dl.PETScVector): Computed gradient.
         """
         forward_vector, _, _ = state_list
         self._input_component_buffer = fex_converter.extract_components(
@@ -479,7 +483,7 @@ class MisfitSettings:
         implemented yet.
 
     Attributes:
-        function_space (dl.FunctionSpace): Function space of the forward variable. CAn be scalar
+        function_space (dl.FunctionSpace): Function space of the forward variable. Can be scalar
             or vector-valued.
         observation_points (npt.NDArray[np.floating] | Iterable[npt.NDArray[np.floating]]):
             Points of observation to project to. Either single array or collection of arrays for
@@ -555,7 +559,7 @@ class Misfit:
 class MisfitBuilder:
     """Builder for misfit objects.
 
-    THe builder takes a [`MisfitSettings`][spin.hippylib.misfit.MisfitSettings] object and builds a
+    The builder takes a [`MisfitSettings`][spin.hippylib.misfit.MisfitSettings] object and builds a
     misfit object according to the provided configuration. The builder distinguishes between
     single-component and vector-valued function spaces, as well as stationary and time-dependent
     misfits (time-dependent misfit are not yet implemented though!).
@@ -645,7 +649,7 @@ class MisfitBuilder:
 
     # ----------------------------------------------------------------------------------------------
     def _build_misfit(self) -> Misfit:
-        """Builds the misfit from the assembles noise precision and observation matrices.
+        """Builds the misfit from the assembled noise precision and observation matrices.
 
         The method distinguishes four different cases:
 
