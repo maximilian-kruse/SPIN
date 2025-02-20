@@ -88,8 +88,7 @@ mesh = dl.IntervalMesh(100, -1.5, 1.5).
 
 On this mesh, we set up a [`SPINProblem`][spin.core.problem.SPINProblem] object, which is basically
 an extension of Hippylib`s `PDEProblem` for stochastic processes. such PDE problems can solve the
-PDE itself, as well as the adjoint and gradient equations in a Lagrangian formalism. we will
-re-visit these functionalities at a later point.
+PDE itself, as well as the adjoint and gradient equations in a Lagrangian formalism.
 
 The setup of the `SPINProblem` follows a builder pattern. We provide the problem configuration in
 the [`SPINProblemSettings`][spin.core.problem.SPINProblemSettings] data class,
@@ -182,13 +181,51 @@ data_values = data_values + noise
 ```
 
 The ground truth for the drift parameter and PDE solution, as well as the generated data, are
-deppicted below.
+depicted below.
 
 <figure markdown="span">
   ![Tensor Field](../images/tutorial_ground_truth.png){ width="800" }
 </figure>
 
 ## Prior
+
+Nest, we discuss how to set up a prior measure for our function space inverse problem. For this
+purpose, Hippylib most prominently employs Gaussian random fields with a Matèrn-like covariance
+structure. We employ and extend a special field of this type. Specifically, we define a prior
+measure $\mathcal{N}(\bar{b}, \mathcal{R}^{-1})$, with a precision operator $\mathcal{R}$
+reminiscent of the inverse bi-Laplacian,
+
+$$
+    \mathcal{R} = (\delta(x)\mathcal{I}-\gamma(x)\Delta)^2,\quad x\in\mathcal{A}
+$$
+
+with potentially space-dependent parameters $\delta$ and $\gamma$. As we have to discretize the
+precision on a bounded domain $\mathcal{A}$, we prescribe Robin boundary conditions (supposed to
+mitigate boundary artifacts),
+
+$$
+    \mathcal{R} = \gamma\nabla b n + \frac{\sqrt{\gamma\delta}}{c}b, ,\quad x\in\partial\mathcal{A}
+$$
+
+with a user-defined constant $c$ and outward normal coefficients $n\in\{-1, 1\}$. The parameter
+coefficients have direct correspondences (neglecting boundary effects), to the variance $\sigma^2$ and 
+correlation length $\rho$ of the resulting field,
+
+$$
+    \sigma^2 = \frac{\Gamma(\frac{3}{2})}{2\sqrt{\pi}}\frac{1}{\delta^\frac{3}{2}\gamma^\frac{1}{2}}, \quad
+    \rho = \sqrt{\frac{12\gamma}{\delta}}.
+$$
+
+After suitable discretization, we obtain a prior density with respect to the Lebesgue measure,
+
+$$
+    \pi_{\text{prior}}(b) \propto \exp\Big( -\frac{1}{2}|| b - \bar{b} ||_{R}^2 \Big),
+$$
+
+with mean vector $\bar{b}$ and sparse precision matrix $\mathbf{R}$.
+
+Similar to the problem set up, generation of the prior follows the builder pattern. We configure
+the prior in the [`PriorSettings`][spin.hippylib.prior.PriorSettings] data class,
 
 ```py
 prior_settings = prior.PriorSettings(
@@ -201,10 +238,26 @@ prior_settings = prior.PriorSettings(
 )
 ```
 
+Here we have set $\bar{b}(x) = -x$ as `mean`, $\sigma^2=1$ as `variance`, and $\rho=1$ as
+`correlation_length`. Again, these arguments need to be provided as dolfin expression strings on
+for the corresponding `function_space`, in this case the function space of the parameter. 
+Lastly, we define whether to apply Robin boundary conditions, and set the constant $c$ via
+`robin_bc_const = 3.0`.
+
+With the given settings, we invoke the builder,
+
 ```py
 prior_builder = prior.BilaplacianVectorPriorBuilder(prior_settings)
 spin_prior = prior_builder.build()
 ```
+
+The builder returns a SPIN [`Prior`][spin.hippylib.prior.Prior] object, which is a wrapper to 
+Hippylibs prior fields. These object define the negative log density of the prior as a cost
+functional, and implement functionalities for the gradient and Hessian-vector product of the cost
+w.r.t. to the parameter, here $b$. We can further conveniently generate the pointwise variance of
+the prior, either exactly, or through randomized estimation of the covariance matrix trace.
+Here we employ the latter option, which is matrix-free and thus suitable for large-scale applications.
+The trace is estimated from a truncated SVD, utilizing the first 50 eigenvalues of $\mathbf{R}$,
 
 ```py
 prior_variance = spin_prior.compute_variance_with_boundaries(
@@ -212,11 +265,42 @@ prior_variance = spin_prior.compute_variance_with_boundaries(
 )
 ```
 
+THe prior mean and 95% confidence intervals now look like this:
 <figure markdown="span">
   ![Tensor Field](../images/tutorial_prior.png){ width="500" }
 </figure>
 
-## Misfit
+Clearly, we obtain a constant variance field in the interior of the domain, whereas some deviation
+towards the boundaries is observable.
+
+## Likelihood
+
+As the second ingredient, we define a likelihood density. Recall that we have defined the observables
+as the solution of the PDE at a discrete number of data locations. This can be expressed through
+an observation operator $\mathcal{B}$, or an observation matrix $\mathbf{B}$ in the discrete setting.
+We therefore set $\tau_d = \mathbf{B}\tau_1$, whereas we know that $\tau_1$ is given as a function
+of m through the MFPT PDE. We summarize PDE solve and projection in the (discretized)
+parameter-to-observable map $\mathbf{F}$, i.e. $\tau_d = \mathbf{F}(b)$.
+
+We have further generated our data as
+
+$$
+y = \mathbf{F}(b)+ \eta,\quad \eta\sim\mathcal{N}(0, \mathbf{\Gamma}_{\text{noise}}),
+\quad \mathbf{\Gamma}_{\text{noise}} = k^2 \mathbf{I}.
+$$
+
+Accordingly, we define the likelihood for observing the given data $y$, given a parameter $b$, as
+
+$$
+\pi_{\text{like}}(y | b) \propto \exp\Big( -\frac{1}{2}|| y-\mathbf{F}(b) ||_{\Gamma_{\text{noise}}^{-1}}^2 \Big).
+$$
+
+The negative log-likelihood can again be defined as a cost or misfit functional, the underlying
+implementation provides the functionalities to compute the gradient and Hessian-vector product of that
+misfit w.r.t. the solution variable, here $\tau_1$.
+
+Construction of the misfit is again done with a builder. We provide a configuration with a
+[`MisfitSettings`][spin.hippylib.misfit.MisfitSettings] data class.
 
 ```py
 misfit_settings = misfit.MisfitSettings(
@@ -227,12 +311,25 @@ misfit_settings = misfit.MisfitSettings(
 )
 ```
 
+Configuration requires a `function_space`, in this case the function space of the solution
+variable, observation points and data values specified as `observation_points` and `observation_values`,
+and a `noise_variance` array. Importantly, SPIN only supports diagonal noise covariance matrices,
+so that the noise array effectifely defines the diagonal of $\Gamma_\text{noise}$.
+
+We build the misfit analogously to the previous objects,
 ```py
 misfit_builder = misfit.MisfitBuilder(misfit_settings)
 spin_misfit = misfit_builder.build()
 ```
 
+This yields a SPIN [`Misfit`][spin.hippylib.misfit.Misfit] object, which provides extra functionalities
+compared to the Hippylib Object.
+
+
 ## Hippylib Inference Model
+
+Given the required components for the Bayesian inverse problem formulation, we can plug them together
+in a Hippylib `Model` object.
 
 ```py
 inference_model = hl.Model(
@@ -242,10 +339,27 @@ inference_model = hl.Model(
 )
 ```
 
+This object basically defines the negative log-posterior, which in
+our case is given as
+
+$$
+    -\log(\pi_\text{post}(b|y)) 
+    \propto \frac{1}{2}|| y-\mathbf{F}(b) ||_{\Gamma_{\text{noise}}^{-1}}^2
+    + \frac{1}{2}|| b - \bar{b} ||_{R}^2.
+$$
+
+The Hippylib inference model can evaluate gradients and Hessian-vector products of the negative log posterior
+w.r.t. $b$. For the parameter-to-observable map, it employes a Lagrangian approach, s.th.. derivatives
+can be efficiently computed via the adjoint of the defined PDE.
+
 
 ## Maximum A-Posteriori Estimate
+
+The negative log-posterior can be interpreted as a cost functional to be minimized. This amounts to
+the Maximum a-posteriori (MAP) estimate.
+
 ```py
-    optimization_settings = optimization.SolverSettings(
+optimization_settings = optimization.SolverSettings(
     relative_tolerance=1e-8,
     absolute_tolerance=1e-12,
     verbose=True
