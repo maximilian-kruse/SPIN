@@ -356,7 +356,11 @@ can be efficiently computed via the adjoint of the defined PDE.
 ## Maximum A-Posteriori Estimate
 
 The negative log-posterior can be interpreted as a cost functional to be minimized. This amounts to
-the Maximum a-posteriori (MAP) estimate.
+the Maximum a-posteriori (MAP) estimate. Hippylib provides a powerful Newton-type optimization
+algorithm for finding the MAP. It employs the CG algorithm for linear system solves, together witch
+Steihaug and Eisenstat-Walker stopping criteria. Plenty of configuration options for the solver are
+available in SPIN through the [`SolverSettings`][spin.hippylib.optimization.SolverSettings] data class.
+Here, we merely set relative and absolute tolerance, as well as verbosity of the algorithm,
 
 ```py
 optimization_settings = optimization.SolverSettings(
@@ -366,9 +370,13 @@ optimization_settings = optimization.SolverSettings(
 )
 ```
 
+We can then initialize SPIN's [`NewtonCGSolver`][spin.hippylib.optimization.NewtonCGSolver] wrapper
+class with the given settings and hippylib model, and solve for the MAP with an initial guess
+(here the prior mean).
+
 ```py
-initial_guess = spin_prior.mean_array
 newton_solver = optimization.NewtonCGSolver(optimization_settings, inference_model)
+initial_guess = spin_prior.mean_array
 solver_solution = newton_solver.solve(initial_guess)
 print("Termination reason:", solver_solution.termination_reason)
 ```
@@ -384,6 +392,10 @@ It  cg_it cost            misfit          reg             (g,dm)          ||g||L
   7   8    9.101899e+00    4.011912e+00    5.089987e+00   -2.642558e-07   6.848649e-03   1.000000e+00   4.612421e-04
 Termination reason: Norm of the gradient less than tolerance
 ```
+
+This returns a [`SolverResult`][spin.hippylib.optimization.SolverResult] object, containing the optimal
+parameter value $b^*$, the corresponding solution of the forward and adjoint MFPT PDEs, and additional
+metadata of the optimization run.
 
 ## Low-Rank Hessian Approximation
 
