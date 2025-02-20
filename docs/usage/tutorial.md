@@ -397,7 +397,47 @@ This returns a [`SolverResult`][spin.hippylib.optimization.SolverResult] object,
 parameter value $b^*$, the corresponding solution of the forward and adjoint MFPT PDEs, and additional
 metadata of the optimization run.
 
-## Low-Rank Hessian Approximation
+
+## Laplace Approximation
+
+After having obtained a point estimate (the MAP), we turn to a method of variational inference called
+the Laplace approximation. The Laplace approximation basically amounts to a linearization of the forward
+model underpinning the inverse problem. For the given setting, this yields a Gaussian posterior approximation
+$\mathcal{N}(b^*, \mathbf{H}^{-1})$, where $\mathbf{H}\in\mathbb{R}^{N\times N}$ is the Hessian of the negative log posterior at the
+point $b^*$. Actually assembling the Hessian is prohibitive, so we rely on a low-rank approximation of
+the matrix, which can be computed using algorithms from Hippylib.
+
+To this end, we first notice that the Hessian $\mathbf{R}$ can be split into contributions from the
+likelihood and the prior,
+
+$$
+    \mathbf{H} = \mathbf{H}_\text{misfit} + \mathbf{R},\quad
+    \mathbf{H}_\text{misfit} = \mathbf{F}^T(b^*)\Gamma_\text{noise}^{-1}\mathbf{F}(b^*).
+$$
+
+For a given matrix Rank $r\ll N$, we can compute a truncated generalized eigenvalue decomposition,
+
+$$
+    \mathbf{H}_\text{misfit} v_i = \lambda_i\mathbf{R} v_i, \quad \lambda_1 \geq \ldots \geq \lambda_r.
+$$
+
+These eigenvalue/-vector pairs can be computed matrix-free via randomized linear algebra algorithms.
+
+Note that all eigenvalues are positive as both $\mathbf{H}_\text{misfit}$ and $\mathbf{R}$ are s.p.d.
+Defining the  matrices $\mathbf{D}_r = \text{diag}(\lambda_1,\ldots,\lambda_r)\in\mathbb{R}^{r\times r}$ and
+$\mathbf{V}_r = [v_1,\ldots,v_r]\in\mathbb{R}^{N\times r}$, we can now write $\mathbf{H}$ as
+
+$$
+    \mathbf{H} = \mathbf{R} + \mathbf{R}\mathbf{V}_r\mathbf{D}_r\mathbf{V}_r^T\mathbf{R}
+    + \mathcal{O} \big( \sum_{i=r+1}^N \lambda_i \big)
+$$
+
+Clearly, we can obtain a reasonable approximation of $\mathbf{H}$ without the trailing eigenvalue terms,
+if $\lambda_i \ll 1\,  \forall i > r$. This amounts to compactness of the underlying Hessian operator.
+
+In SPIN, we employ Hippylib's implementation of the double pass algorithm to solve the generalized
+eigenvalue problem above. We configure the algorithm with a
+[`LowRankHessianSettings`][spin.hippylib.hessian.LowRankHessianSettings] data class,
 
 ```py
 hessian_settings = hessian.LowRankHessianSettings(
@@ -406,22 +446,38 @@ hessian_settings = hessian.LowRankHessianSettings(
     num_oversampling=5,
     gauss_newton_approximation=False,
 )
+
+```
+
+We need to provide an inference model, as well as the number of eigenvalue/-vector pairs we want
+to compute. `num_oversampling` indicates the number of additional eigenpairs to be computed for
+numerical stability of the algorithm (basically that we do not get negative eigenvalues).
+Lastly, we can determine if we want to utilize the Gauss-Newton approximation of the Hessian for
+the computation.
+
+With that, we can compute the low-rank approximation of the Hessian at an `evaluation_point`, here
+$b^*$ and the corresponding forad and adjoint PDE solutions,
+```py
 evaluation_point = [
     solver_solution.forward_solution,
     solver_solution.optimal_parameter,
     solver_solution.adjoint_solution,
 ]
-```
-
-```py
 eigenvalues, eigenvectors = hessian.compute_low_rank_hessian(hessian_settings, evaluation_point)
 ```
 
+The computed eigenvalues are depicted below.
 <figure markdown="span">
   ![Tensor Field](../images/tutorial_hessian_eigenvalues.png){ width="500" }
 </figure>
 
-## Laplace Approximation
+We can observe that the eigenvalues fall well below one rather quickly, so that our low-rank
+approximation/compactness assumption is justified.
+
+Given the MAP estimate and Hessian approximation, we can plug together a Laplace approximation in 
+the [`LowRankLaplaceApproximation`][spin.hippylib.laplace.LowRankLaplaceApproximation]. This is basically
+a nicer version of Hippylib's `GaussianLRPosterior` object. We again parameterize the object with a
+data class, [`LowRankLaplaceApproximationSettings`][spin.hippylib.laplace.LowRankLaplaceApproximationSettings],
 
 ```py
 laplace_approximation_settings = laplace.LowRankLaplaceApproximationSettings(
@@ -431,17 +487,24 @@ laplace_approximation_settings = laplace.LowRankLaplaceApproximationSettings(
     low_rank_hessian_eigenvectors=eigenvectors,
 )
 ```
+but construct it without a builder this time,
 
 ```py
 laplace_approximation = laplace.LowRankLaplaceApproximation(laplace_approximation_settings)
 ```
 
+The Laplace approximation object can evaluate its pointwise variance field, analogously to the prior,
 ```py
 posterior_variance = laplace_approximation.compute_pointwise_variance(
     method="Randomized", num_eigenvalues_randomized=50
 )
-posterior_predictive = spin_problem.solve_forward(solver_solution.optimal_parameter)
 ```
+
+We visualize below the posterior mean and 95% confidence intervals according to the Laplace approximation.
+In addition, we inspect the posterior mean predictive (simply the `forward_solution` attribute in
+our `SolverResult` object). We see that the posterior approximation well aligns with the cubic
+form of our ground truth for the drift vector $b(x)$, along with a significant variance reduction
+compared to the prior. The posterior predictive is in excellent agreement with the data.
 
 <figure markdown="span">
   ![Tensor Field](../images/tutorial_posterior_laplace.png){ width="800" }
