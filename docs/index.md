@@ -1,7 +1,7 @@
 # SPIN: Stochastic Process INference [<img src="images/uq_logo.png" width="200" height="100" alt="UQ at KIT" align="right">](https://www.scc.kit.edu/forschung/uq.php)
 
 SPIN is a Python package for the non-parametric Bayesian inference of the parameter functions of autonomous diffusion processes.
-It can be used to infer the drift function $\mathbf{b}: \Omega\to\mathbb{R}^d$ and (squared) diffusion function $\mathbf{\Sigma}:\Omega\to\mathbb{R}^{d\times d}$ from trajectory data of an underlying process $\mathbf{X}_t$ on a domain $\Omega\in\mathbb{R}^d$, indexed over $t\in\mathbb{R}_+$,
+It can be used to infer the drift function $\mathbf{b}: \Omega\to\mathbb{R}^d$ and (squared) diffusion function $\mathbf{\Sigma}:\Omega\to\mathbb{R}^{d\times d}$ from trajectory data of an underlying process $\mathbf{X}_t$ on a domain $\Omega\subset\mathbb{R}^d$, indexed over $t\in\mathbb{R}_+$,
 
 $$
     d\mathbf{X}_t = \mathbf{b}(\mathbf{X}_t) dt + \sqrt{\mathbf{\Sigma}(\mathbf{X}_t)} d\mathbf{W}_t,\quad \mathbf{X}(t=0)=\mathbf{X}_0\ a.s.
@@ -34,7 +34,6 @@ pixi install
 
 ## Documentation
 
-We give a brief introduction to the theory underpinning SPIN in the [Theory](usage/theory.md) section.
 A walk-through for solving a simple inference problem with SPIN is given in the [Tutorial](usage/tutorial.md)
 We further provide [runnable examples](https://github.com/UQatKIT/SPIN/tree/main/examples) for different
 use-cases in our Github repository.

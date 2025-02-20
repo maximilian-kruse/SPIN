@@ -1,12 +1,76 @@
 # Tutorial
 
+To illustrate the usage of SPIN, we present in this tutorial a simple examplary inference use-case.
+The problem under consideration deals with the inference of the drift function for a stochastic
+process on a 1D domain $\Omega\subseteq\mathbb{R}$. We assume that such a process, indexed over
+$t\in\mathbb{R}_+$ can be modelled by an SDE of the form
+
+$$
+    dX_t = b(X_t)dt + \sigma(X_t)dW_t,
+$$
+
+with scalar drift $b(x)$, diffusion $\sigma(x)$ and Wiener process $W_t$. Moreoever, we consider
+the scenario where $\sigma$ is known and $b$ is to be inferred from data.
+
+This data is assumed to be available in form of the mean first passage time (MFPT) of the process
+from a bounded domain $\mathcal{A}\subset\Omega$. Recall that the first passage time of the process
+from $\mathcal{A}$ is defined as
+
+$$
+    \tau(x) = \inf\{ t\geq 0: X_t \neq\mathcal{A}|X_0 = x \}.
+$$
+
+The MFPT is then given as $\tau_1(x) = \mathbb{E}[\tau(x)]$. A PDE model describing the MFPT in
+terms of the drift and diffusion function can be deduced from the Kolmogorov backward equation.
+Specifically, it holds that
+
+$$
+\begin{gather*}
+    \mathcal{L}\tau_1 = -1,\quad x\in\mathcal{A} \\
+    \tau_1 = 0,\quad x\in\partial\mathcal{A},
+\end{gather*}
+$$
+
+where $\mathcal{L}$ is the infinitesimal generator of the underlying process,
+
+$$
+    \mathcal{L} = b(x)\frac{d}{dx} + \frac{1}{2}\sigma^2(x)\frac{d^2}{dx^2}.
+$$
+
+In total, the goal of this tutorial is to showcase Bayesian inference of $b(x)$, given
+(noise-polluted) data of $\tau_1$.
+
+!!! info "Visualization code not shown"
+    To make this tutorial more concise, we limit code exposition to the actual functionality of
+    SPIN. The code for visualization can be found in the corresponding example notebook
+    [`1D_drift_mfpt.ipynb`](https://github.com/UQatKIT/SPIN/tree/main/examples/1D_drift_mfpt.ipynb).
+
+!!! info "Other use-cases available"
+    Other inference use-cases, which are simple extensions of the one presented here, can be found
+    in the [`examples`](https://github.com/UQatKIT/SPIN/tree/main/examples/) directory of the SPIN
+    repository.
+
 ## Imports
+
+We start by elucidating the necessary imports for inference with SPIN. Most of the inference 
+algorithms come directly from `hippylib`, or are extensions of these algorithms. PDEs are solved
+in Hippylib, and therefore in SPIN, with the finite element method (FEM). For this we use Fenics,
+whose core library is `dolfin`. However, we only need dolfin explicitly for the generation of a
+Fenics-conformant computational mesh here. The only remaining dependency is `numpy` for basic
+array handling.
 
 ```py
 import dolfin as dl
 import hippylib as hl
 import numpy as np
 ```
+
+SPIN itself is subdivided into three packages, namely `core`, `fenics`, and `hippylib`. The `core`
+sub-package contains the functionality that is specific to stochastic process inference. Think of it
+as a Hippylib plug-in. In `fenics`, we extend the functionality of (mainly) dolfin for our
+applications and ease of use. Lastly `hippylib` comprises an extension of the original Hippylib
+library. On the one hand, this is to simply provide a more modern, Pythonic interface to Hippylib.
+On the other hand, we implement here new functionality necessary for our inference use-cases.
 
 ```py
 from spin.core import problem
@@ -16,9 +80,19 @@ from spin.hippylib import hessian, laplace, misfit, optimization, prior
 
 ## SPIN Problem Setup
 
+We set up a computational mesh resembling the domain $\mathcal{A}$, in this case the interval
+$[-1.5, +1.5]$, discretized uniformly with 100 elements,
 ```py
-mesh = dl.IntervalMesh(100, -1.5, 1.5)
+mesh = dl.IntervalMesh(100, -1.5, 1.5).
 ```
+
+On this mesh, we set up a [`SPINProblem`][spin.core.problem.SPINProblem] object, which is basically
+an extension of Hippylib`s `PDEProblem` for stochastic processes. such PDE problems can solve the
+PDE itself, as well as the adjoint and gradient equations in a Lagrangian formalism. we will
+re-visit these functionalities at a later point.
+
+The setup of the `SPINProblem` follows a builder pattern. We provide the problem configuration in
+the [`SPINProblemSettings`][spin.core.problem.SPINProblemSettings] data class,
 
 ```py
 problem_settings = problem.SPINProblemSettings(
@@ -29,6 +103,38 @@ problem_settings = problem.SPINProblemSettings(
 )
 ```
 
+Firstly, the configuration requires a computational `mesh`. Next, we define the `pde_type`, which
+determines the PDE model that governs the inference. Implemented options are `"mean_exit_time"`, 
+`"mean_exit_time_moments"`, and `"fokker_planck"`. In addition, we need to define the
+`inference_type`, meaning which parameter function(s) to infer. Available options are 
+`"drift_only"`, `"diffusion_only"`, and `"drift_and_diffusion"`.
+
+Lastly, as we only infer drift, we need to specify a diffusion function $\sigma(x)$. In this case,
+we prescribe
+
+$$
+    \sigma^2(x) = x^2 + 2.
+$$
+
+Importantly, we do not specify $\sigma$ directly, but the `log_squared_diffusion` $\log(\sigma^2)$.
+This is to ensure uniqueness and posititivity of the diffusion when it is inferred as well.
+
+Another important aspect is that parameter functions need to be defined in dolfin syntax. This means
+firstly that the number of components need to match the underlying function space. The function 
+spaces for drift and diffusion are always vector-valued. Since we are in 1D, we need to specify
+a vector with one component, which is done by providing a list with one entry. Secondly, the
+function components themselves are defined as strings in C++ syntax, as these strings can be
+compiled by dolfin. Most transformation in the [`cmath`](https://cplusplus.com/reference/cmath/)
+library are supported. If something is not recognized, try adding the `std::` namespace. Also
+note that we apply the function to the grid dimension zero, `x[0]`, not just `x`.
+
+!!! info "SPIN only supports diagonal diffusion matrices"
+    To avoid trouble with the symmetric positive definiteness of the diffusion matrix, SPIN
+    only supports diagonal matrices. `log_squared_diffusion` takes a vector of the diagonal
+    components $\log(\sigma_i^2)$. Internally, we apply the exponential to these components,
+    ensuring that the resulting matrix is s.p.d.
+
+Given the problem configuration, we can generate our SPIN problem object,
 ```py
 problem_builder = problem.SPINProblemBuilder(problem_settings)
 spin_problem = problem_builder.build()
@@ -36,11 +142,14 @@ spin_problem = problem_builder.build()
 
 ## Ground Truth and Data
 
-```py
-parameter_coordinates = spin_problem.coordinates_parameters
-solution_coordinates = spin_problem.coordinates_variables
-```
+As we consider an artificial example problem, we can ourselves define a ground truth. We set
 
+$$
+    b_{\text{true}}(x) = -2x^3 + 3x.
+$$
+
+We again compile this function with a dolfin expression string, and convert it to a numpy array,
+using the [`converter`][spin.fenics.converter] module,
 ```py
 true_parameter = converter.create_dolfin_function(
     ("-2*std::pow(x[0],3) + 3*x[0]",), spin_problem.function_space_parameters
@@ -50,19 +159,30 @@ true_parameter = converter.convert_to_numpy(
 )
 ```
 
+We then generate "true" MFPT values by solving the PDE with the prescribed parameter function,
 ```py
 true_solution = spin_problem.solve_forward(true_parameter)
 ```
+
+To generate artificial observation data, we simply use the true forward solution at a discrete
+set of points, and perturb it randomly. Specifically, we extract locations from the solution 
+coordinates with a uniform `data_stride = 5`, and add a zero-centered Gaussian noise to every point,
+with standard deviation `noise_Std = 0.01`, 
 
 ```py
 noise_std = 0.01
 data_stride = 5
 rng = np.random.default_rng(seed=0)
+
+solution_coordinates = spin_problem.coordinates_variables
 data_locations = solution_coordinates[4:-5:data_stride]
 data_values = true_solution[4:-5:data_stride]
 noise = rng.normal(loc=0, scale=noise_std, size=data_values.size)
 data_values = data_values + noise
 ```
+
+The ground truth for the drift parameter and PDE solution, as well as the generated data, are
+deppicted below.
 
 <figure markdown="span">
   ![Tensor Field](../images/tutorial_ground_truth.png){ width="800" }

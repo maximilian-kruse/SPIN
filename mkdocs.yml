@@ -114,7 +114,6 @@ extra_css:
 nav:
   - Getting Started: index.md
   - Usage:
-      - Theory: usage/theory.md
       - Tutorial: usage/tutorial.md
   - API Reference:
       - Core:

@@ -7,7 +7,7 @@
 # SPIN: Stochastic Process INference
 
 SPIN is a Python package for the non-parametric Bayesian inference of the parameter functions of autonomous diffusion processes.
-It can be used to infer the drift function $\mathbf{b}: \Omega\to\mathbb{R}^d$ and (squared) diffusion function $\mathbf{\Sigma}:\Omega\to\mathbb{R}^{d\times d}$ from trajectory data of an underlying process $\mathbf{X}$ on a domain $\Omega\in\mathbb{R}^d$, indexed over $t\in\mathbb{R} _+ $,
+It can be used to infer the drift function $\mathbf{b}: \Omega\to\mathbb{R}^d$ and (squared) diffusion function $\mathbf{\Sigma}:\Omega\to\mathbb{R}^{d\times d}$ from trajectory data of an underlying process $\mathbf{X}$ on a domain $\Omega\subset\mathbb{R}^d$, indexed over $t\in\mathbb{R} _+ $,
 
 $$
     d\mathbf{X}_t = \mathbf{b}(\mathbf{X}_t) dt + \sqrt{\mathbf{\Sigma}(\mathbf{X}_t)} d\mathbf{W}_t,\quad \mathbf{X}(t=0)=\mathbf{X}_0\ a.s.
