@@ -3,7 +3,7 @@
 To illustrate the usage of SPIN, we present in this tutorial a simple examplary inference use-case.
 The problem under consideration deals with the inference of the drift function for a stochastic
 process on a 1D domain $\Omega\subseteq\mathbb{R}$. We assume that such a process, indexed over
-$t\in\mathbb{R}_+$ can be modelled by an SDE of the form
+$t\in\mathbb{R}_+$, can be modelled by an SDE of the form
 
 $$
     dX_t = b(X_t)dt + \sigma(X_t)dW_t,
@@ -26,7 +26,7 @@ Specifically, it holds that
 
 $$
 \begin{gather*}
-    \mathcal{L}\tau_1 = -1,\quad x\in\mathcal{A} \\
+    \mathcal{L}\tau_1 = -1,\quad x\in\mathcal{A}, \\
     \tau_1 = 0,\quad x\in\partial\mathcal{A},
 \end{gather*}
 $$
@@ -46,7 +46,7 @@ In total, the goal of this tutorial is to showcase Bayesian inference of $b(x)$,
     [`1D_drift_mfpt.ipynb`](https://github.com/UQatKIT/SPIN/tree/main/examples/1D_drift_mfpt.ipynb).
 
 !!! info "Other use-cases available"
-    Other inference use-cases, which are simple extensions of the one presented here, can be found
+    Other inference use-cases, which are straightforward extensions of the one presented here, can be found
     in the [`examples`](https://github.com/UQatKIT/SPIN/tree/main/examples/) directory of the SPIN
     repository.
 
@@ -87,7 +87,7 @@ mesh = dl.IntervalMesh(100, -1.5, 1.5).
 ```
 
 On this mesh, we set up a [`SPINProblem`][spin.core.problem.SPINProblem] object, which is basically
-an extension of Hippylib`s `PDEProblem` for stochastic processes. such PDE problems can solve the
+an extension of Hippylib's `PDEProblem` for stochastic processes. Such PDE problem objects can solve the
 PDE itself, as well as the adjoint and gradient equations in a Lagrangian formalism.
 
 The setup of the `SPINProblem` follows a builder pattern. We provide the problem configuration in
@@ -108,7 +108,7 @@ determines the PDE model that governs the inference. Implemented options are `"m
 `inference_type`, meaning which parameter function(s) to infer. Available options are 
 `"drift_only"`, `"diffusion_only"`, and `"drift_and_diffusion"`.
 
-Lastly, as we only infer drift, we need to specify a diffusion function $\sigma(x)$. In this case,
+Lastly, as we only infer the drift, we need to specify a diffusion function $\sigma(x)$. In this case,
 we prescribe
 
 $$
@@ -125,7 +125,7 @@ a vector with one component, which is done by providing a list with one entry. S
 function components themselves are defined as strings in C++ syntax, as these strings can be
 compiled by dolfin. Most transformation in the [`cmath`](https://cplusplus.com/reference/cmath/)
 library are supported. If something is not recognized, try adding the `std::` namespace. Also
-note that we apply the function to the grid dimension zero, `x[0]`, not just `x`.
+note that we apply the function to the coordinate dimension zero, `x[0]`, not just `x`.
 
 !!! info "SPIN only supports diagonal diffusion matrices"
     To avoid trouble with the symmetric positive definiteness of the diffusion matrix, SPIN
@@ -166,7 +166,7 @@ true_solution = spin_problem.solve_forward(true_parameter)
 To generate artificial observation data, we simply use the true forward solution at a discrete
 set of points, and perturb it randomly. Specifically, we extract locations from the solution 
 coordinates with a uniform `data_stride = 5`, and add a zero-centered Gaussian noise to every point,
-with standard deviation `noise_Std = 0.01`, 
+with standard deviation `noise_std = 0.01`, 
 
 ```py
 noise_std = 0.01
@@ -204,7 +204,7 @@ precision on a bounded domain $\mathcal{A}$, we prescribe Robin boundary conditi
 mitigate boundary artifacts),
 
 $$
-    \mathcal{R} = \gamma\nabla b n + \frac{\sqrt{\gamma\delta}}{c}b, ,\quad x\in\partial\mathcal{A}
+    \mathcal{R}b = \gamma\nabla b n + \frac{\sqrt{\gamma\delta}}{c}b,\quad x\in\partial\mathcal{A}
 $$
 
 with a user-defined constant $c$ and outward normal coefficients $n\in\{-1, 1\}$. The parameter
@@ -224,7 +224,7 @@ $$
 
 with mean vector $\bar{b}$ and sparse precision matrix $\mathbf{R}$.
 
-Similar to the problem set up, generation of the prior follows the builder pattern. We configure
+Similar to the problem setup, generation of the prior follows the builder pattern. We configure
 the prior in the [`PriorSettings`][spin.hippylib.prior.PriorSettings] data class,
 
 ```py
@@ -255,9 +255,9 @@ The builder returns a SPIN [`Prior`][spin.hippylib.prior.Prior] object, which is
 Hippylibs prior fields. These object define the negative log density of the prior as a cost
 functional, and implement functionalities for the gradient and Hessian-vector product of the cost
 w.r.t. to the parameter, here $b$. We can further conveniently generate the pointwise variance of
-the prior, either exactly, or through randomized estimation of the covariance matrix trace.
+the prior, either exactly, or through randomized estimation of the covariance matrix diagonal.
 Here we employ the latter option, which is matrix-free and thus suitable for large-scale applications.
-The trace is estimated from a truncated SVD, utilizing the first 50 eigenvalues of $\mathbf{R}$,
+The diagonal is estimated from a truncated SVD, utilizing the first 50 eigenvalues of $\mathbf{R}$,
 
 ```py
 prior_variance = spin_prior.compute_variance_with_boundaries(
@@ -265,7 +265,7 @@ prior_variance = spin_prior.compute_variance_with_boundaries(
 )
 ```
 
-THe prior mean and 95% confidence intervals now look like this:
+The prior mean and 95% confidence intervals now look like this:
 <figure markdown="span">
   ![Tensor Field](../images/tutorial_prior.png){ width="500" }
 </figure>
@@ -275,7 +275,7 @@ towards the boundaries is observable.
 
 ## Likelihood
 
-As the second ingredient, we define a likelihood density. Recall that we have defined the observables
+As the second ingredient of the Bayesian formalism, we define a likelihood density. Recall that we have defined the observables
 as the solution of the PDE at a discrete number of data locations. This can be expressed through
 an observation operator $\mathcal{B}$, or an observation matrix $\mathbf{B}$ in the discrete setting.
 We therefore set $\tau_d = \mathbf{B}\tau_1$, whereas we know that $\tau_1$ is given as a function
@@ -407,7 +407,7 @@ $\mathcal{N}(b^*, \mathbf{H}^{-1})$, where $\mathbf{H}\in\mathbb{R}^{N\times N}$
 point $b^*$. Actually assembling the Hessian is prohibitive, so we rely on a low-rank approximation of
 the matrix, which can be computed using algorithms from Hippylib.
 
-To this end, we first notice that the Hessian $\mathbf{R}$ can be split into contributions from the
+To this end, we first notice that the Hessian $\mathbf{H}$ can be split into contributions from the
 likelihood and the prior,
 
 $$
@@ -422,8 +422,8 @@ $$
 $$
 
 These eigenvalue/-vector pairs can be computed matrix-free via randomized linear algebra algorithms.
-
 Note that all eigenvalues are positive as both $\mathbf{H}_\text{misfit}$ and $\mathbf{R}$ are s.p.d.
+
 Defining the  matrices $\mathbf{D}_r = \text{diag}(\lambda_1,\ldots,\lambda_r)\in\mathbb{R}^{r\times r}$ and
 $\mathbf{V}_r = [v_1,\ldots,v_r]\in\mathbb{R}^{N\times r}$, we can now write $\mathbf{H}$ as
 
@@ -456,7 +456,7 @@ Lastly, we can determine if we want to utilize the Gauss-Newton approximation of
 the computation.
 
 With that, we can compute the low-rank approximation of the Hessian at an `evaluation_point`, here
-$b^*$ and the corresponding forad and adjoint PDE solutions,
+$b^*$ and the corresponding forward and adjoint PDE solutions,
 ```py
 evaluation_point = [
     solver_solution.forward_solution,
@@ -475,8 +475,8 @@ We can observe that the eigenvalues fall well below one rather quickly, so that 
 approximation/compactness assumption is justified.
 
 Given the MAP estimate and Hessian approximation, we can plug together a Laplace approximation in 
-the [`LowRankLaplaceApproximation`][spin.hippylib.laplace.LowRankLaplaceApproximation]. This is basically
-a nicer version of Hippylib's `GaussianLRPosterior` object. We again parameterize the object with a
+a [`LowRankLaplaceApproximation`][spin.hippylib.laplace.LowRankLaplaceApproximation] object. This is basically
+a nicer version of Hippylib's `GaussianLRPosterior`. We again parameterize the object with a
 data class, [`LowRankLaplaceApproximationSettings`][spin.hippylib.laplace.LowRankLaplaceApproximationSettings],
 
 ```py

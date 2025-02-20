@@ -34,7 +34,7 @@ pixi install
 
 ## Documentation
 
-A walk-through for solving a simple inference problem with SPIN is given in the [Tutorial](usage/tutorial.md)
+A walk-through for solving a simple inference problem with SPIN is given in the [Tutorial](usage/tutorial.md).
 We further provide [runnable examples](https://github.com/UQatKIT/SPIN/tree/main/examples) for different
 use-cases in our Github repository.
 For more information regarding the implementation of SPIN, we refer to the API reference.
