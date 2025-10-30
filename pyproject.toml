@@ -1,7 +1,7 @@
 [project]
-authors = [{ name = "Maximilian Kruse", email = "maximilian.kruse@kit.edu" }]
+authors = [{ name = "Maximilian Kruse", email = "maxkruse1604@gmail.com" }]
 maintainers = [
-    { name = "Maximilian Kruse", email = "maximilian.kruse@kit.edu" },
+    { name = "Maximilian Kruse", email = "maxkruse1604@gmail.com" },
 ]
 description = "Non-Parametric Inference for Diffusion Processes"
 name = "spin"
