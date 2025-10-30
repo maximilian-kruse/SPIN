@@ -36,10 +36,4 @@ SPIN depends on a mixture of pip and conda dependencies, which can be efficientl
 pixi install
 ```
 
-The [documentation](https://uqatkit.github.io/SPIN/) provides further information regarding usage, theoretical background, technical setup and API. We also provide runnable notebooks under [`examples`](https://github.com/UQatKIT/SPIN/tree/main/examples).
-
-## Acknowledgement and License
-
-SPIN is being developed in the research group [Uncertainty Quantification](https://www.scc.kit.edu/forschung/uq.php) at KIT.
-Large portions of SPIN are based on the [hIPPYlib](https://dl.acm.org/doi/10.1145/3428447) software library for large-scale (Bayesian) inverse problems. hIPPYlib, in turn, uses [FEniCS](https://fenicsproject.org/) for finite element computations.
-SPIN is distributed as free software under the [MIT License](https://choosealicense.com/licenses/mit/).
+The [documentation](https://maximilian-kruse.github.io/SPIN/) provides further information regarding usage, theoretical background, technical setup and API. We also provide runnable notebooks under [`examples`](https://github.com/maximilian-kruse/SPIN/tree/main/examples).
